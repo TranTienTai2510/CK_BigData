@@ -1,0 +1,562 @@
+{
+  "model_ver": "intent_v1",
+  "architecture": "gru",
+  "champion_variant": "gru_full",
+  "created_utc": "2026-11-05 03:33:33",
+  "feature_version": 1,
+  "feature_spec_file": "feature_spec.json",
+  "onnx_file": "intent_v1.onnx",
+  "onnx_size_bytes": 101732,
+  "max_len": 50,
+  "inputs": {
+    "x_cat": {
+      "dtype": "int64",
+      "shape": [
+        "batch",
+        50,
+        3
+      ],
+      "fields": [
+        "type_idx",
+        "cat_idx",
+        "brand_idx"
+      ],
+      "padding": "left (PAD=0, NULL=1, OOV=2, vocab>=3)"
+    },
+    "x_num": {
+      "dtype": "float32",
+      "shape": [
+        "batch",
+        50,
+        10
+      ],
+      "fields": [
+        "log_price",
+        "log_qty",
+        "log_dt_prev_s",
+        "log_t_first_s",
+        "same_prod",
+        "log_n_view",
+        "log_n_add",
+        "log_n_remove",
+        "slog_cart_units",
+        "log_pos"
+      ],
+      "padding": "left (0.0)"
+    },
+    "length": {
+      "dtype": "int64",
+      "shape": [
+        "batch"
+      ],
+      "description": "number of valid steps in window (1..50)"
+    },
+    "shop": {
+      "dtype": "int64",
+      "shape": [
+        "batch"
+      ],
+      "mapping": {
+        "synthetic": 3,
+        "rees46_cosmetics": 4
+      }
+    }
+  },
+  "outputs": {
+    "prob": {
+      "dtype": "float32",
+      "shape": [
+        "batch"
+      ],
+      "description": "calibrated probability P(session ends with purchase | prefix)"
+    }
+  },
+  "hyperparameters": {
+    "d_model": 32,
+    "n_layers": 1,
+    "n_heads": 4,
+    "dropout": 0.1,
+    "epochs": 3,
+    "batch_size": 2048,
+    "pos_weight": 2.1157,
+    "calibration_params_by_shop_idx": {
+      "3": [
+        0.994774,
+        -0.786876
+      ],
+      "4": [
+        1.033288,
+        -0.702683
+      ]
+    }
+  },
+  "offline_metrics": {
+    "val": {
+      "overall": {
+        "samples": 138658,
+        "positives": 25974,
+        "pos_rate": 0.1873,
+        "roc_auc": 0.778,
+        "pr_auc": 0.3808,
+        "brier": 0.1298,
+        "logloss": 0.4001
+      },
+      "by_prefix_len": {
+        "1": {
+          "samples": 48000,
+          "positives": 4373,
+          "pos_rate": 0.0911,
+          "roc_auc": 0.8247,
+          "pr_auc": 0.2706,
+          "brier": 0.0699,
+          "logloss": 0.2341
+        },
+        "2": {
+          "samples": 22819,
+          "positives": 4333,
+          "pos_rate": 0.1899,
+          "roc_auc": 0.7354,
+          "pr_auc": 0.3508,
+          "brier": 0.1373,
+          "logloss": 0.4282
+        },
+        "3-5": {
+          "samples": 34639,
+          "positives": 8393,
+          "pos_rate": 0.2423,
+          "roc_auc": 0.7209,
+          "pr_auc": 0.3907,
+          "brier": 0.1627,
+          "logloss": 0.49
+        },
+        "6-10": {
+          "samples": 22634,
+          "positives": 6700,
+          "pos_rate": 0.296,
+          "roc_auc": 0.6867,
+          "pr_auc": 0.4187,
+          "brier": 0.187,
+          "logloss": 0.549
+        },
+        "11-20": {
+          "samples": 6515,
+          "positives": 1309,
+          "pos_rate": 0.2009,
+          "roc_auc": 0.6887,
+          "pr_auc": 0.3507,
+          "brier": 0.1487,
+          "logloss": 0.4637
+        },
+        "21-50": {
+          "samples": 3374,
+          "positives": 744,
+          "pos_rate": 0.2205,
+          "roc_auc": 0.6296,
+          "pr_auc": 0.3112,
+          "brier": 0.1662,
+          "logloss": 0.51
+        },
+        ">50": {
+          "samples": 677,
+          "positives": 122,
+          "pos_rate": 0.1802,
+          "roc_auc": 0.5403,
+          "pr_auc": 0.2037,
+          "brier": 0.1532,
+          "logloss": 0.4844
+        }
+      },
+      "by_shop": {
+        "rees46_cosmetics": {
+          "overall": {
+            "samples": 79752,
+            "positives": 6196,
+            "pos_rate": 0.0777,
+            "roc_auc": 0.7708,
+            "pr_auc": 0.2009,
+            "brier": 0.0662,
+            "logloss": 0.2366
+          },
+          "by_prefix_len": {
+            "1": {
+              "samples": 36000,
+              "positives": 994,
+              "pos_rate": 0.0276,
+              "roc_auc": 0.6904,
+              "pr_auc": 0.089,
+              "brier": 0.0258,
+              "logloss": 0.1138
+            },
+            "2": {
+              "samples": 11943,
+              "positives": 954,
+              "pos_rate": 0.0799,
+              "roc_auc": 0.6815,
+              "pr_auc": 0.1371,
+              "brier": 0.0714,
+              "logloss": 0.2631
+            },
+            "3-5": {
+              "samples": 13573,
+              "positives": 1285,
+              "pos_rate": 0.0947,
+              "roc_auc": 0.6934,
+              "pr_auc": 0.1696,
+              "brier": 0.0824,
+              "logloss": 0.2912
+            },
+            "6-10": {
+              "samples": 8522,
+              "positives": 1145,
+              "pos_rate": 0.1344,
+              "roc_auc": 0.6627,
+              "pr_auc": 0.2055,
+              "brier": 0.112,
+              "logloss": 0.3736
+            },
+            "11-20": {
+              "samples": 5663,
+              "positives": 952,
+              "pos_rate": 0.1681,
+              "roc_auc": 0.6503,
+              "pr_auc": 0.2489,
+              "brier": 0.1345,
+              "logloss": 0.4314
+            },
+            "21-50": {
+              "samples": 3374,
+              "positives": 744,
+              "pos_rate": 0.2205,
+              "roc_auc": 0.6296,
+              "pr_auc": 0.3112,
+              "brier": 0.1662,
+              "logloss": 0.51
+            },
+            ">50": {
+              "samples": 677,
+              "positives": 122,
+              "pos_rate": 0.1802,
+              "roc_auc": 0.5403,
+              "pr_auc": 0.2037,
+              "brier": 0.1532,
+              "logloss": 0.4844
+            }
+          }
+        },
+        "synthetic": {
+          "overall": {
+            "samples": 58906,
+            "positives": 19778,
+            "pos_rate": 0.3358,
+            "roc_auc": 0.6044,
+            "pr_auc": 0.4057,
+            "brier": 0.2158,
+            "logloss": 0.6215
+          },
+          "by_prefix_len": {
+            "1": {
+              "samples": 12000,
+              "positives": 3379,
+              "pos_rate": 0.2816,
+              "roc_auc": 0.5161,
+              "pr_auc": 0.2919,
+              "brier": 0.2024,
+              "logloss": 0.5948
+            },
+            "2": {
+              "samples": 10876,
+              "positives": 3379,
+              "pos_rate": 0.3107,
+              "roc_auc": 0.5776,
+              "pr_auc": 0.3748,
+              "brier": 0.2097,
+              "logloss": 0.6095
+            },
+            "3-5": {
+              "samples": 21066,
+              "positives": 7108,
+              "pos_rate": 0.3374,
+              "roc_auc": 0.6094,
+              "pr_auc": 0.4057,
+              "brier": 0.2145,
+              "logloss": 0.6181
+            },
+            "6-10": {
+              "samples": 14112,
+              "positives": 5555,
+              "pos_rate": 0.3936,
+              "roc_auc": 0.5579,
+              "pr_auc": 0.4298,
+              "brier": 0.2322,
+              "logloss": 0.655
+            },
+            "11-20": {
+              "samples": 852,
+              "positives": 357,
+              "pos_rate": 0.419,
+              "roc_auc": 0.5396,
+              "pr_auc": 0.472,
+              "brier": 0.2427,
+              "logloss": 0.6786
+            }
+          }
+        }
+      }
+    },
+    "test": {
+      "overall": {
+        "samples": 138663,
+        "positives": 25667,
+        "pos_rate": 0.1851,
+        "roc_auc": 0.785,
+        "pr_auc": 0.3825,
+        "brier": 0.1274,
+        "logloss": 0.3935
+      },
+      "by_prefix_len": {
+        "1": {
+          "samples": 48000,
+          "positives": 4379,
+          "pos_rate": 0.0912,
+          "roc_auc": 0.8269,
+          "pr_auc": 0.2718,
+          "brier": 0.0695,
+          "logloss": 0.2323
+        },
+        "2": {
+          "samples": 22952,
+          "positives": 4319,
+          "pos_rate": 0.1882,
+          "roc_auc": 0.7456,
+          "pr_auc": 0.358,
+          "brier": 0.1347,
+          "logloss": 0.4203
+        },
+        "3-5": {
+          "samples": 34599,
+          "positives": 8337,
+          "pos_rate": 0.241,
+          "roc_auc": 0.7316,
+          "pr_auc": 0.3951,
+          "brier": 0.16,
+          "logloss": 0.4815
+        },
+        "6-10": {
+          "samples": 22723,
+          "positives": 6734,
+          "pos_rate": 0.2964,
+          "roc_auc": 0.6855,
+          "pr_auc": 0.4106,
+          "brier": 0.1868,
+          "logloss": 0.5478
+        },
+        "11-20": {
+          "samples": 6425,
+          "positives": 1262,
+          "pos_rate": 0.1964,
+          "roc_auc": 0.6885,
+          "pr_auc": 0.3451,
+          "brier": 0.1454,
+          "logloss": 0.4581
+        },
+        "21-50": {
+          "samples": 3261,
+          "positives": 538,
+          "pos_rate": 0.165,
+          "roc_auc": 0.6361,
+          "pr_auc": 0.261,
+          "brier": 0.1351,
+          "logloss": 0.4372
+        },
+        ">50": {
+          "samples": 703,
+          "positives": 98,
+          "pos_rate": 0.1394,
+          "roc_auc": 0.6978,
+          "pr_auc": 0.2698,
+          "brier": 0.1242,
+          "logloss": 0.4157
+        }
+      },
+      "by_shop": {
+        "rees46_cosmetics": {
+          "overall": {
+            "samples": 79439,
+            "positives": 5507,
+            "pos_rate": 0.0693,
+            "roc_auc": 0.7639,
+            "pr_auc": 0.1825,
+            "brier": 0.0603,
+            "logloss": 0.221
+          },
+          "by_prefix_len": {
+            "1": {
+              "samples": 36000,
+              "positives": 929,
+              "pos_rate": 0.0258,
+              "roc_auc": 0.6669,
+              "pr_auc": 0.0774,
+              "brier": 0.0243,
+              "logloss": 0.1099
+            },
+            "2": {
+              "samples": 12010,
+              "positives": 869,
+              "pos_rate": 0.0724,
+              "roc_auc": 0.6788,
+              "pr_auc": 0.1282,
+              "brier": 0.0653,
+              "logloss": 0.2457
+            },
+            "3-5": {
+              "samples": 13585,
+              "positives": 1143,
+              "pos_rate": 0.0841,
+              "roc_auc": 0.7148,
+              "pr_auc": 0.1626,
+              "brier": 0.0738,
+              "logloss": 0.2659
+            },
+            "6-10": {
+              "samples": 8327,
+              "positives": 1056,
+              "pos_rate": 0.1268,
+              "roc_auc": 0.6754,
+              "pr_auc": 0.2075,
+              "brier": 0.1062,
+              "logloss": 0.3574
+            },
+            "11-20": {
+              "samples": 5553,
+              "positives": 874,
+              "pos_rate": 0.1574,
+              "roc_auc": 0.6306,
+              "pr_auc": 0.2335,
+              "brier": 0.1293,
+              "logloss": 0.4219
+            },
+            "21-50": {
+              "samples": 3261,
+              "positives": 538,
+              "pos_rate": 0.165,
+              "roc_auc": 0.6361,
+              "pr_auc": 0.261,
+              "brier": 0.1351,
+              "logloss": 0.4372
+            },
+            ">50": {
+              "samples": 703,
+              "positives": 98,
+              "pos_rate": 0.1394,
+              "roc_auc": 0.6978,
+              "pr_auc": 0.2698,
+              "brier": 0.1242,
+              "logloss": 0.4157
+            }
+          }
+        },
+        "synthetic": {
+          "overall": {
+            "samples": 59224,
+            "positives": 20160,
+            "pos_rate": 0.3404,
+            "roc_auc": 0.6028,
+            "pr_auc": 0.4057,
+            "brier": 0.2174,
+            "logloss": 0.6249
+          },
+          "by_prefix_len": {
+            "1": {
+              "samples": 12000,
+              "positives": 3450,
+              "pos_rate": 0.2875,
+              "roc_auc": 0.5162,
+              "pr_auc": 0.2925,
+              "brier": 0.2048,
+              "logloss": 0.5997
+            },
+            "2": {
+              "samples": 10942,
+              "positives": 3450,
+              "pos_rate": 0.3153,
+              "roc_auc": 0.5804,
+              "pr_auc": 0.3809,
+              "brier": 0.2108,
+              "logloss": 0.612
+            },
+            "3-5": {
+              "samples": 21014,
+              "positives": 7194,
+              "pos_rate": 0.3423,
+              "roc_auc": 0.6085,
+              "pr_auc": 0.4083,
+              "brier": 0.2158,
+              "logloss": 0.6208
+            },
+            "6-10": {
+              "samples": 14396,
+              "positives": 5678,
+              "pos_rate": 0.3944,
+              "roc_auc": 0.5483,
+              "pr_auc": 0.4187,
+              "brier": 0.2335,
+              "logloss": 0.6579
+            },
+            "11-20": {
+              "samples": 872,
+              "positives": 388,
+              "pos_rate": 0.445,
+              "roc_auc": 0.49,
+              "pr_auc": 0.4366,
+              "brier": 0.2477,
+              "logloss": 0.6886
+            }
+          }
+        }
+      }
+    }
+  },
+  "onnx_parity_check": {
+    "onnx_path": "models\\intent_v1.onnx",
+    "onnx_size_bytes": 101732,
+    "samples_verified": 1000,
+    "max_abs_diff": 1.043081283569336e-07,
+    "mean_abs_diff": 2.212822458602659e-08,
+    "max_abs_diff_batch1": 1.862645149230957e-09,
+    "tolerance": 0.0001,
+    "passed": true
+  },
+  "challenger": {
+    "variant": "transformer_full",
+    "architecture": "transformer",
+    "onnx_file": "intent_transformer_full.onnx",
+    "val_overall": {
+      "samples": 138658,
+      "positives": 25974,
+      "pos_rate": 0.1873,
+      "roc_auc": 0.7776,
+      "pr_auc": 0.3801,
+      "brier": 0.1298,
+      "logloss": 0.4005
+    },
+    "test_overall": {
+      "samples": 138663,
+      "positives": 25667,
+      "pos_rate": 0.1851,
+      "roc_auc": 0.784,
+      "pr_auc": 0.3816,
+      "brier": 0.1276,
+      "logloss": 0.3942
+    },
+    "onnx_parity_check": {
+      "onnx_path": "models\\intent_transformer_full.onnx",
+      "onnx_size_bytes": 133908,
+      "samples_verified": 1000,
+      "max_abs_diff": 8.940696716308594e-08,
+      "mean_abs_diff": 2.1867453625645794e-08,
+      "max_abs_diff_batch1": 2.421438694000244e-08,
+      "tolerance": 0.0001,
+      "passed": true
+    }
+  }
+}

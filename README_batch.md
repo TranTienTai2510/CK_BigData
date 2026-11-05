@@ -17,6 +17,11 @@ data/fx/DEXBZUS.csv  (optional) daily BRL per USD from FRED, for Olist USD conve
   data/unified/olist/{orders,order_items,payments,reviews,products,sellers,customers,geolocation}/
   data/unified/quarantine/shop_id=rees46_cosmetics/
   data/unified/_dq/<shop>.json
+        │
+        └─ ml/prefixes.py ─► data/prefix/{feature_spec.json, sessions/shop_id=<shop>/split=<split>/, _report.json}
+              │
+              ├─ ml/baselines.py ─► data/prefix/_baselines.json   (Markov + GBM baselines, AUC/PR-AUC by prefix length)
+              └─ ml/train_dl.py  ─► models/{intent_v1.onnx, model_card.json, feature_spec.json}, data/prefix/_dl_ablation.json
 ```
 
 ## Run (Python 3.10+, `pip install pyspark==3.5.5`, JDK 17; stop the Docker stack first)
@@ -33,13 +38,25 @@ python batch/adapters/synthetic.py --curated data/curated --out data/unified --s
 python batch/adapters/rees46.py    --raw data/raw_rees46  --out data/unified --strict --driver-memory 4g --cores 4
 python batch/adapters/olist.py     --raw data/raw_olist   --out data/unified --strict [--fx-csv data/fx/DEXBZUS.csv]
 python batch/check_unified.py      --unified data/unified --strict
+python ml/prefixes.py              --unified data/unified --out data/prefix
+python ml/baselines.py             --prefix  data/prefix  --out data/prefix/_baselines.json
+python ml/train_dl.py              --prefix  data/prefix  --out-dir models --report data/prefix/_dl_ablation.json
 ```
 `--strict` exits with code 1 if any hard invariant fails. Each adapter rewrites only its own `shop_id=` folders.
+`ml/prefixes.py` builds the shared vocabulary (`data/prefix/feature_spec.json`, from the `train` split only) and the
+prefix dataset (`data/prefix/sessions/shop_id=<shop>/split=<split>/`, cut at `cut_seq_no`) used by training and Q2
+(`ml/features.py`). `ml/baselines.py` trains the Week 1 Markov and GBM baselines on `train` and outputs ROC-AUC and
+PR-AUC tables by prefix length `k` on `val` and `test`. `ml/train_dl.py` trains the Week 2 GRU and Transformer models
+with class-weighted loss and Platt calibration, runs the ablation suite, and exports `models/intent_v1.onnx` +
+`models/model_card.json` + `models/feature_spec.json` (handover G4).
 
 ## Tests without the real data (fixtures with independent ground truth)
 
 ```bash
 python tests/test_runtime_env.py
+python tests/test_features_parity.py                                          # G2 batch-vs-stream tensor parity
+python tests/test_baselines.py                                                # Markov + GBM baseline checks
+python tests/test_onnx_parity.py                                              # G4 PyTorch-vs-ONNX parity (< 1e-4 on 1,000 samples)
 python tests/make_rees46_fixture.py --out tests/fixture_rees46
 python batch/adapters/rees46.py --raw tests/fixture_rees46 --out data/unified --files-out 4 --shuffle-partitions 16 --strict
 python tests/test_rees46_adapter.py --unified data/unified --fixture tests/fixture_rees46     # 22 checks
