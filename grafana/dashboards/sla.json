@@ -1,0 +1,83 @@
+{
+ "uid": "sla",
+ "title": "SLA Olist",
+ "refresh": "5s",
+ "panels": [
+  {
+   "type": "timeseries",
+   "title": "SLA daily",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT d, delivered, avg_late FROM rt.v_sla_daily ORDER BY d",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "By state",
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT customer_state, delivered FROM rt.v_sla_by_state",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Orders 1m",
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, event_type, n FROM rt.v_orders_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Reviews",
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT review_score, n FROM rt.v_review_dist",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  }
+ ]
+}

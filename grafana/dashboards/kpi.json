@@ -1,0 +1,83 @@
+{
+ "uid": "kpi",
+ "title": "KPI realtime",
+ "refresh": "5s",
+ "panels": [
+  {
+   "type": "timeseries",
+   "title": "Funnel 1m",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, shop_id, purchases FROM rt.v_funnel_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "KPI 1m",
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, shop_id, revenue FROM rt.v_kpi_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Throughput",
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, job, eps FROM ops.v_throughput_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "DLQ",
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, shop_id, n FROM rt.v_dlq_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  }
+ ]
+}

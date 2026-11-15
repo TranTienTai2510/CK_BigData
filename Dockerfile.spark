@@ -1,0 +1,36 @@
+FROM python:3.10-slim-bookworm
+
+USER root
+
+# Spark 3.5.x runs on JVM 8/11/17. The Spark distribution itself comes from
+# the pip pyspark package (same 3.5.5 jars as the tarball), so the build only
+# needs PyPI access -- no archive.apache.org download (~400MB tarball).
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        openjdk-17-jre-headless \
+        procps \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+        pyspark==3.5.5 \
+        onnxruntime==1.20.1 \
+        pyarrow==17.0.0 \
+        pandas==2.2.3 \
+        kafka-python==2.0.2 \
+    && python --version && pip --version && java -version \
+    && python -c "import pyspark, os; print('pyspark at', os.path.dirname(pyspark.__file__))"
+
+ENV PYSPARK_PYTHON=/usr/local/bin/python \
+    PYSPARK_DRIVER_PYTHON=/usr/local/bin/python \
+    PYTHONUNBUFFERED=1 \
+    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+# NOTE: SPARK_HOME is resolved at container start by spark-entrypoint.sh
+# to the pip pyspark directory (it ships bin/ + sbin/ + jars/).
+
+WORKDIR /opt/project
+
+COPY docker/spark-entrypoint.sh /usr/local/bin/spark-entrypoint.sh
+RUN chmod +x /usr/local/bin/spark-entrypoint.sh \
+    && mkdir -p /opt/project/checkpoints
+
+ENTRYPOINT ["/usr/local/bin/spark-entrypoint.sh"]

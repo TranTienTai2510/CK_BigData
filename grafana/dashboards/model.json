@@ -1,0 +1,83 @@
+{
+ "uid": "model",
+ "title": "Model online",
+ "refresh": "5s",
+ "panels": [
+  {
+   "type": "timeseries",
+   "title": "Pred 1m",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, n, avg_prob FROM rt.v_pred_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Online eval",
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT m, n_closed FROM rt.v_online_eval_1m ORDER BY m",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Conversion",
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT shop_id, sessions, purchases FROM rt.v_conversion_by_shop",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Top cat",
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "rawSql": "SELECT category, views FROM rt.v_top_categories",
+     "refId": "A"
+    }
+   ],
+   "datasource": {
+    "type": "grafana-clickhouse-datasource"
+   }
+  }
+ ]
+}
