@@ -1,0 +1,32 @@
+{
+  "base_rows": 114385,
+  "cross_month_sessions": 39,
+  "duplicates_collapsed": 700,
+  "expected_quarantined": 67,
+  "file_rows": {
+    "2019-Nov.csv.gz": 43249,
+    "2019-Oct.csv": 71903
+  },
+  "injected_duplicates": 700,
+  "injected_duplicates_by_type": {
+    "cart": 135,
+    "purchase": 60,
+    "remove_from_cart": 17,
+    "view": 488
+  },
+  "orders": 3067,
+  "purchase_items": 9509,
+  "purchase_not_last": 1221,
+  "qty_gt1_add_to_cart": 135,
+  "qty_gt1_purchase_items": 60,
+  "qty_gt1_remove_from_cart": 17,
+  "rows_out": 107943,
+  "sessions": 6100,
+  "sessions_added_by_gap_split": 60,
+  "sessions_multi_order": 271,
+  "sessions_with_purchase": 2781,
+  "single_event_sessions": 171,
+  "source_session_user_pairs": 6040,
+  "source_user_session_ids": 6000,
+  "zero_price_products": 4
+}

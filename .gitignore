@@ -1,7 +1,110 @@
-.venv/
-data/
-models/*.onnx
-models/*.pt
+# ==============================================================================
+# Git Ignore Rules: Real-time E-commerce Clickstream Analytics
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Python & Virtual Environments
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Jupyter Notebooks
 .pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# ------------------------------------------------------------------------------
+# 2. Large Datasets & Raw Files (Do not commit to Git - share via Drive)
+# ------------------------------------------------------------------------------
+data/
+*.rar
+*.zip
+*.tar.gz
+*.7z
+
+# Scale fixtures (> 2 GB)
+tests/fixture_rees46_scaled/
+
+# Allow small test fixture files if needed
+!tests/fixture_rees46/ground_truth.json
+!tests/fixture_olist/ground_truth.json
+
+# ------------------------------------------------------------------------------
+# 3. Model Weights & Binary Artifacts (> 100MB / binary graphs)
+# ------------------------------------------------------------------------------
+models/*.onnx
+models/*.pt
+models/*.pth
+models/*.bin
+models/*.ckpt
+models/*.pkl
+models/*.joblib
+
+# Always track model metadata & feature contracts
+!models/model_card.json
+!models/feature_spec.json
+
+# ------------------------------------------------------------------------------
+# 4. Big Data, Streaming Checkpoints & Logs
+# ------------------------------------------------------------------------------
+checkpoints/
+spark-checkpoints/
+spark-warehouse/
+metastore_db/
+derby.log
+*.log
+
+# Docker local volume directories (if mounted to host)
+redpanda-data/
+clickhouse-data/
+grafana-data/
+
+# ------------------------------------------------------------------------------
+# 5. OS & IDE Metadata
+# ------------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# JetBrains / VS Code
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

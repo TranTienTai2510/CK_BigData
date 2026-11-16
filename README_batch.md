@@ -57,6 +57,11 @@ python tests/test_runtime_env.py
 python tests/test_features_parity.py                                          # G2 batch-vs-stream tensor parity
 python tests/test_baselines.py                                                # Markov + GBM baseline checks
 python tests/test_onnx_parity.py                                              # G4 PyTorch-vs-ONNX parity (< 1e-4 on 1,000 samples)
+python tests/test_q2_parity.py                                                # G5 Q2 Batch-vs-Stream parity (< 1e-5)
+python tests/test_online_eval.py                                              # G6 Online AUC vs Offline (|delta| <= 0.02) + A/B test
+python analysis/live.py eval --out data/prefix/_online_eval.json              # Online evaluation report
+python analysis/live.py monitor --dry-run                                     # Pipeline monitor (STALL / BACKPRESSURE check)
+python analysis/live.py tail --threshold 0.5                                  # High intent session tail
 python tests/make_rees46_fixture.py --out tests/fixture_rees46
 python batch/adapters/rees46.py --raw tests/fixture_rees46 --out data/unified --files-out 4 --shuffle-partitions 16 --strict
 python tests/test_rees46_adapter.py --unified data/unified --fixture tests/fixture_rees46     # 22 checks

@@ -1,0 +1,55 @@
+{
+  "brl_per_usd": 3.4,
+  "carrier_before_approved": 30,
+  "delivered_before_carrier": 20,
+  "geo_outside_brazil": 8,
+  "item_rows": 5089,
+  "not_defined_payments": 5,
+  "null_category_products": 6,
+  "order_events": {
+    "delivered": 1875,
+    "handed_to_carrier": 1895,
+    "order_placed": 2000,
+    "payment_approved": 1985,
+    "review_created": 1649
+  },
+  "order_events_ts_fixed": {
+    "delivered": 20,
+    "handed_to_carrier": 30,
+    "review_created": 1
+  },
+  "orders": 2000,
+  "orders_with_items": 1985,
+  "orders_with_multiple_reviews": 16,
+  "orders_without_items": 15,
+  "orders_without_payments": 1,
+  "pairs": 3233,
+  "pairs_qty_gt1": 1227,
+  "payments_rows": 2195,
+  "review_id_shared": 1,
+  "reviews_before_delivery": 31,
+  "reviews_kept": 1649,
+  "reviews_rows": 1665,
+  "samples": {
+    "dst": {
+      "amount_brl": 369.14,
+      "amount_usd": 108.57,
+      "days_late": -8.01,
+      "order_key": "df52ec1ee1bee2351cdcaa315ebb3de0",
+      "purchase_utc": "2018-01-16 22:22:55"
+    },
+    "std": {
+      "amount_brl": 623.91,
+      "amount_usd": 183.5,
+      "days_late": -17.02,
+      "order_key": "f38b3ca5f26f206783029472569ad548",
+      "purchase_utc": "2017-07-26 00:05:03"
+    }
+  },
+  "status_delivered_without_delivered_ts": 5,
+  "unique_persons": 1102,
+  "untranslated_categories": [
+    "pc_gamer"
+  ],
+  "zip_prefixes": 120
+}
