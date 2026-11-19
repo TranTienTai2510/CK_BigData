@@ -2,7 +2,6 @@
 import argparse, json, os, sys, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from pyspark.sql import SparkSession
-from common.messages import SCHEMA_VERSION, TOPIC_METRICS
 
 def main():
     ap = argparse.ArgumentParser()
@@ -18,8 +17,8 @@ def main():
     # poll active streaming queries via progress API by attaching listener is complex in py; simple heartbeat:
     while True:
         payload = {"job": a.job, "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                   "status": "RUNNING", "schema_version": SCHEMA_VERSION}
-        prod.send(TOPIC_METRICS, key=a.job, value=payload).get(timeout=15)
+                   "status": "RUNNING", "schema_version": 3}
+        prod.send("ops.metrics", key=a.job, value=payload).get(timeout=15)
         time.sleep(a.interval_s)
 
 if __name__ == "__main__":

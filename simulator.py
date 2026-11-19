@@ -15,8 +15,8 @@ Features (G1):
     (approx N x throughput, for --fold 1/5/10/20 test)
   - throughput target ~1100 events/s at default settings (tune speed-factor)
 
-Topics (8 total, created by redpanda-init in docker-compose.yml, see common/messages.py):
-  events.raw, events.clean, order_events.raw, agg.kpi, pred.intent, session.closed,
+Topics (7 total, created by redpanda-init in docker-compose.yml):
+  events.raw, order_events.raw, agg.kpi, pred.intent, session.closed,
   ops.metrics, events.dlq
 
 Examples:
@@ -43,8 +43,7 @@ from typing import Any, Iterable
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 
 LOG = logging.getLogger("simulator")
-
-from common.messages import SCHEMA_VERSION, TOPIC_EVENTS_RAW, TOPIC_ORDER_EVENTS_RAW
+SCHEMA_VERSION = 3
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,8 +54,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mode", default="both", choices=["events", "orders", "both"])
     p.add_argument("--ym", default="", help="Comma list of ym=YYYY-MM to replay; empty = all.")
     p.add_argument("--bootstrap-server", default="localhost:19092")
-    p.add_argument("--events-topic", default=TOPIC_EVENTS_RAW)
-    p.add_argument("--orders-topic", default=TOPIC_ORDER_EVENTS_RAW)
+    p.add_argument("--events-topic", default="events.raw")
+    p.add_argument("--orders-topic", default="order_events.raw")
     p.add_argument("--speed-factor", type=float, default=50.0)
     p.add_argument("--max-sleep", type=float, default=5.0)
     p.add_argument("--limit", type=int, default=0)
