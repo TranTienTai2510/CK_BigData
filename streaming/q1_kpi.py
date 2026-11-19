@@ -3,8 +3,9 @@ import argparse, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from pyspark.sql import functions as F, types as T
 from common.canonical import EVENT_SCHEMA
+from common.messages import TOPIC_EVENTS_CLEAN, TOPIC_KPI
 
-def build(spark, bootstrap, in_topic="events.clean", out_topic="agg.kpi",
+def build(spark, bootstrap, in_topic=TOPIC_EVENTS_CLEAN, out_topic=TOPIC_KPI,
           watermark="10 minutes", starting="latest"):
     src = (spark.readStream.format("kafka")
            .option("kafka.bootstrap.servers", bootstrap)

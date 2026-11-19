@@ -4,9 +4,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from pyspark.sql import functions as F, types as T
 from common.canonical import EVENT_SCHEMA
 from common.contract import CANONICAL_RULES, failed_rules_col
+from common.messages import TOPIC_DLQ, TOPIC_EVENTS_CLEAN, TOPIC_EVENTS_RAW
 
-def build(spark, bootstrap, raw_topic="events.raw", clean_topic="events.clean",
-          dlq_topic="events.dlq", starting="latest"):
+def build(spark, bootstrap, raw_topic=TOPIC_EVENTS_RAW, clean_topic=TOPIC_EVENTS_CLEAN,
+          dlq_topic=TOPIC_DLQ, starting="latest"):
     raw = (spark.readStream.format("kafka")
            .option("kafka.bootstrap.servers", bootstrap)
            .option("subscribe", raw_topic)

@@ -11,14 +11,24 @@ RUN apt-get update \
         procps \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir --default-timeout=300 --retries=10 \
         pyspark==3.5.5 \
         onnxruntime==1.20.1 \
         pyarrow==17.0.0 \
         pandas==2.2.3 \
+        numpy==1.26.4 \
         kafka-python==2.0.2 \
     && python --version && pip --version && java -version \
     && python -c "import pyspark, os; print('pyspark at', os.path.dirname(pyspark.__file__))"
+
+# CPU-only PyTorch avoids pulling CUDA libraries into the Spark image. Keep the
+# benchmark dependencies in the image so one-off containers do not reinstall them.
+RUN python -m pip install --no-cache-dir --default-timeout=300 --retries=10 \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        torch==2.5.1+cpu \
+        scikit-learn==1.5.2 \
+        scipy==1.14.1 \
+        onnx==1.17.0
 
 ENV PYSPARK_PYTHON=/usr/local/bin/python \
     PYSPARK_DRIVER_PYTHON=/usr/local/bin/python \
