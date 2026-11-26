@@ -1,12 +1,22 @@
 {
   "model_ver": "intent_v1",
-  "architecture": "gru",
-  "champion_variant": "gru_full",
-  "created_utc": "2026-11-05 03:33:33",
+  "task": "binary_classification_session_prefix_purchase_intent",
+  "architecture": "bilstm_attention",
+  "champion_variant": "bilstm_attention",
+  "best_stage1_baseline": "bilstm_attention",
+  "created_utc": "2026-11-26 09:01:02",
   "feature_version": 1,
   "feature_spec_file": "feature_spec.json",
   "onnx_file": "intent_v1.onnx",
-  "onnx_size_bytes": 101732,
+  "onnx_size_bytes": 108050,
+  "n_parameters": 23677,
+  "onnx_cpu_latency_ms": {
+    "b1_median_ms": 0.3345,
+    "b1_mean_ms": 0.336,
+    "b128_median_ms": 12.978,
+    "b128_mean_ms": 12.9033,
+    "runtime": "onnx_cpu_1t"
+  },
   "max_len": 50,
   "inputs": {
     "x_cat": {
@@ -77,17 +87,22 @@
     "n_heads": 4,
     "dropout": 0.1,
     "epochs": 3,
-    "batch_size": 2048,
+    "batch_size": 1536,
     "pos_weight": 2.1157,
     "calibration_params_by_shop_idx": {
       "3": [
-        0.994774,
-        -0.786876
+        1.016625,
+        -0.725036
       ],
       "4": [
-        1.033288,
-        -0.702683
+        1.043087,
+        -0.674071
       ]
+    },
+    "val_optimal_threshold": 0.2345,
+    "val_optimal_threshold_by_shop": {
+      "rees46_cosmetics": 0.1342,
+      "synthetic": 0.2556
     }
   },
   "offline_metrics": {
@@ -96,74 +111,90 @@
         "samples": 138658,
         "positives": 25974,
         "pos_rate": 0.1873,
-        "roc_auc": 0.778,
-        "pr_auc": 0.3808,
-        "brier": 0.1298,
-        "logloss": 0.4001
+        "roc_auc": 0.7786,
+        "pr_auc": 0.3825,
+        "brier": 0.1297,
+        "logloss": 0.3999,
+        "best_f1": 0.4759,
+        "best_threshold": 0.2345
       },
       "by_prefix_len": {
         "1": {
           "samples": 48000,
           "positives": 4373,
           "pos_rate": 0.0911,
-          "roc_auc": 0.8247,
-          "pr_auc": 0.2706,
+          "roc_auc": 0.8265,
+          "pr_auc": 0.2742,
           "brier": 0.0699,
-          "logloss": 0.2341
+          "logloss": 0.234,
+          "best_f1": 0.4131,
+          "best_threshold": 0.1953
         },
         "2": {
           "samples": 22819,
           "positives": 4333,
           "pos_rate": 0.1899,
-          "roc_auc": 0.7354,
-          "pr_auc": 0.3508,
-          "brier": 0.1373,
-          "logloss": 0.4282
+          "roc_auc": 0.7368,
+          "pr_auc": 0.3523,
+          "brier": 0.1372,
+          "logloss": 0.428,
+          "best_f1": 0.4458,
+          "best_threshold": 0.2128
         },
         "3-5": {
           "samples": 34639,
           "positives": 8393,
           "pos_rate": 0.2423,
-          "roc_auc": 0.7209,
-          "pr_auc": 0.3907,
+          "roc_auc": 0.7215,
+          "pr_auc": 0.3931,
           "brier": 0.1627,
-          "logloss": 0.49
+          "logloss": 0.4898,
+          "best_f1": 0.5,
+          "best_threshold": 0.2522
         },
         "6-10": {
           "samples": 22634,
           "positives": 6700,
           "pos_rate": 0.296,
-          "roc_auc": 0.6867,
-          "pr_auc": 0.4187,
-          "brier": 0.187,
-          "logloss": 0.549
+          "roc_auc": 0.6897,
+          "pr_auc": 0.4218,
+          "brier": 0.1866,
+          "logloss": 0.548,
+          "best_f1": 0.5527,
+          "best_threshold": 0.3076
         },
         "11-20": {
           "samples": 6515,
           "positives": 1309,
           "pos_rate": 0.2009,
-          "roc_auc": 0.6887,
-          "pr_auc": 0.3507,
-          "brier": 0.1487,
-          "logloss": 0.4637
+          "roc_auc": 0.6878,
+          "pr_auc": 0.3438,
+          "brier": 0.1488,
+          "logloss": 0.4642,
+          "best_f1": 0.4203,
+          "best_threshold": 0.2038
         },
         "21-50": {
           "samples": 3374,
           "positives": 744,
           "pos_rate": 0.2205,
-          "roc_auc": 0.6296,
-          "pr_auc": 0.3112,
+          "roc_auc": 0.6309,
+          "pr_auc": 0.313,
           "brier": 0.1662,
-          "logloss": 0.51
+          "logloss": 0.5101,
+          "best_f1": 0.3971,
+          "best_threshold": 0.2245
         },
         ">50": {
           "samples": 677,
           "positives": 122,
           "pos_rate": 0.1802,
-          "roc_auc": 0.5403,
-          "pr_auc": 0.2037,
-          "brier": 0.1532,
-          "logloss": 0.4844
+          "roc_auc": 0.5165,
+          "pr_auc": 0.1861,
+          "brier": 0.1557,
+          "logloss": 0.4913,
+          "best_f1": 0.3189,
+          "best_threshold": 0.18
         }
       },
       "by_shop": {
@@ -172,74 +203,90 @@
             "samples": 79752,
             "positives": 6196,
             "pos_rate": 0.0777,
-            "roc_auc": 0.7708,
-            "pr_auc": 0.2009,
+            "roc_auc": 0.7713,
+            "pr_auc": 0.2001,
             "brier": 0.0662,
-            "logloss": 0.2366
+            "logloss": 0.2367,
+            "best_f1": 0.283,
+            "best_threshold": 0.1342
           },
           "by_prefix_len": {
             "1": {
               "samples": 36000,
               "positives": 994,
               "pos_rate": 0.0276,
-              "roc_auc": 0.6904,
-              "pr_auc": 0.089,
+              "roc_auc": 0.6935,
+              "pr_auc": 0.0904,
               "brier": 0.0258,
-              "logloss": 0.1138
+              "logloss": 0.1139,
+              "best_f1": 0.1994,
+              "best_threshold": 0.0597
             },
             "2": {
               "samples": 11943,
               "positives": 954,
               "pos_rate": 0.0799,
-              "roc_auc": 0.6815,
-              "pr_auc": 0.1371,
-              "brier": 0.0714,
-              "logloss": 0.2631
+              "roc_auc": 0.684,
+              "pr_auc": 0.1394,
+              "brier": 0.0713,
+              "logloss": 0.2629,
+              "best_f1": 0.2245,
+              "best_threshold": 0.0911
             },
             "3-5": {
               "samples": 13573,
               "positives": 1285,
               "pos_rate": 0.0947,
-              "roc_auc": 0.6934,
-              "pr_auc": 0.1696,
+              "roc_auc": 0.6953,
+              "pr_auc": 0.1672,
               "brier": 0.0824,
-              "logloss": 0.2912
+              "logloss": 0.2913,
+              "best_f1": 0.2558,
+              "best_threshold": 0.1144
             },
             "6-10": {
               "samples": 8522,
               "positives": 1145,
               "pos_rate": 0.1344,
-              "roc_auc": 0.6627,
+              "roc_auc": 0.6643,
               "pr_auc": 0.2055,
               "brier": 0.112,
-              "logloss": 0.3736
+              "logloss": 0.3734,
+              "best_f1": 0.3047,
+              "best_threshold": 0.1373
             },
             "11-20": {
               "samples": 5663,
               "positives": 952,
               "pos_rate": 0.1681,
-              "roc_auc": 0.6503,
-              "pr_auc": 0.2489,
+              "roc_auc": 0.6494,
+              "pr_auc": 0.2527,
               "brier": 0.1345,
-              "logloss": 0.4314
+              "logloss": 0.4317,
+              "best_f1": 0.3461,
+              "best_threshold": 0.2038
             },
             "21-50": {
               "samples": 3374,
               "positives": 744,
               "pos_rate": 0.2205,
-              "roc_auc": 0.6296,
-              "pr_auc": 0.3112,
+              "roc_auc": 0.6309,
+              "pr_auc": 0.313,
               "brier": 0.1662,
-              "logloss": 0.51
+              "logloss": 0.5101,
+              "best_f1": 0.3971,
+              "best_threshold": 0.2245
             },
             ">50": {
               "samples": 677,
               "positives": 122,
               "pos_rate": 0.1802,
-              "roc_auc": 0.5403,
-              "pr_auc": 0.2037,
-              "brier": 0.1532,
-              "logloss": 0.4844
+              "roc_auc": 0.5165,
+              "pr_auc": 0.1861,
+              "brier": 0.1557,
+              "logloss": 0.4913,
+              "best_f1": 0.3189,
+              "best_threshold": 0.18
             }
           }
         },
@@ -248,56 +295,68 @@
             "samples": 58906,
             "positives": 19778,
             "pos_rate": 0.3358,
-            "roc_auc": 0.6044,
-            "pr_auc": 0.4057,
-            "brier": 0.2158,
-            "logloss": 0.6215
+            "roc_auc": 0.6062,
+            "pr_auc": 0.408,
+            "brier": 0.2156,
+            "logloss": 0.6208,
+            "best_f1": 0.5153,
+            "best_threshold": 0.2556
           },
           "by_prefix_len": {
             "1": {
               "samples": 12000,
               "positives": 3379,
               "pos_rate": 0.2816,
-              "roc_auc": 0.5161,
-              "pr_auc": 0.2919,
-              "brier": 0.2024,
-              "logloss": 0.5948
+              "roc_auc": 0.5239,
+              "pr_auc": 0.2963,
+              "brier": 0.2022,
+              "logloss": 0.5942,
+              "best_f1": 0.4396,
+              "best_threshold": 0.2412
             },
             "2": {
               "samples": 10876,
               "positives": 3379,
               "pos_rate": 0.3107,
-              "roc_auc": 0.5776,
-              "pr_auc": 0.3748,
-              "brier": 0.2097,
-              "logloss": 0.6095
+              "roc_auc": 0.5811,
+              "pr_auc": 0.3767,
+              "brier": 0.2096,
+              "logloss": 0.6093,
+              "best_f1": 0.4771,
+              "best_threshold": 0.2173
             },
             "3-5": {
               "samples": 21066,
               "positives": 7108,
               "pos_rate": 0.3374,
-              "roc_auc": 0.6094,
-              "pr_auc": 0.4057,
-              "brier": 0.2145,
-              "logloss": 0.6181
+              "roc_auc": 0.6111,
+              "pr_auc": 0.4087,
+              "brier": 0.2143,
+              "logloss": 0.6177,
+              "best_f1": 0.5317,
+              "best_threshold": 0.2751
             },
             "6-10": {
               "samples": 14112,
               "positives": 5555,
               "pos_rate": 0.3936,
-              "roc_auc": 0.5579,
-              "pr_auc": 0.4298,
-              "brier": 0.2322,
-              "logloss": 0.655
+              "roc_auc": 0.5625,
+              "pr_auc": 0.4332,
+              "brier": 0.2316,
+              "logloss": 0.6534,
+              "best_f1": 0.5873,
+              "best_threshold": 0.3247
             },
             "11-20": {
               "samples": 852,
               "positives": 357,
               "pos_rate": 0.419,
-              "roc_auc": 0.5396,
-              "pr_auc": 0.472,
-              "brier": 0.2427,
-              "logloss": 0.6786
+              "roc_auc": 0.5242,
+              "pr_auc": 0.4433,
+              "brier": 0.2435,
+              "logloss": 0.68,
+              "best_f1": 0.5925,
+              "best_threshold": 0.4152
             }
           }
         }
@@ -308,74 +367,91 @@
         "samples": 138663,
         "positives": 25667,
         "pos_rate": 0.1851,
-        "roc_auc": 0.785,
-        "pr_auc": 0.3825,
-        "brier": 0.1274,
-        "logloss": 0.3935
+        "roc_auc": 0.7855,
+        "pr_auc": 0.3848,
+        "brier": 0.1273,
+        "logloss": 0.3932,
+        "best_f1": 0.4814,
+        "best_threshold": 0.2291,
+        "f1_at_val_threshold": 0.481
       },
       "by_prefix_len": {
         "1": {
           "samples": 48000,
           "positives": 4379,
           "pos_rate": 0.0912,
-          "roc_auc": 0.8269,
-          "pr_auc": 0.2718,
-          "brier": 0.0695,
-          "logloss": 0.2323
+          "roc_auc": 0.8288,
+          "pr_auc": 0.2747,
+          "brier": 0.0694,
+          "logloss": 0.2323,
+          "best_f1": 0.4214,
+          "best_threshold": 0.1918
         },
         "2": {
           "samples": 22952,
           "positives": 4319,
           "pos_rate": 0.1882,
-          "roc_auc": 0.7456,
-          "pr_auc": 0.358,
+          "roc_auc": 0.7464,
+          "pr_auc": 0.361,
           "brier": 0.1347,
-          "logloss": 0.4203
+          "logloss": 0.4206,
+          "best_f1": 0.4545,
+          "best_threshold": 0.2139
         },
         "3-5": {
           "samples": 34599,
           "positives": 8337,
           "pos_rate": 0.241,
-          "roc_auc": 0.7316,
-          "pr_auc": 0.3951,
-          "brier": 0.16,
-          "logloss": 0.4815
+          "roc_auc": 0.7308,
+          "pr_auc": 0.3968,
+          "brier": 0.1601,
+          "logloss": 0.4817,
+          "best_f1": 0.5104,
+          "best_threshold": 0.2584
         },
         "6-10": {
           "samples": 22723,
           "positives": 6734,
           "pos_rate": 0.2964,
-          "roc_auc": 0.6855,
-          "pr_auc": 0.4106,
-          "brier": 0.1868,
-          "logloss": 0.5478
+          "roc_auc": 0.687,
+          "pr_auc": 0.4121,
+          "brier": 0.1865,
+          "logloss": 0.5465,
+          "best_f1": 0.5543,
+          "best_threshold": 0.3148
         },
         "11-20": {
           "samples": 6425,
           "positives": 1262,
           "pos_rate": 0.1964,
-          "roc_auc": 0.6885,
-          "pr_auc": 0.3451,
-          "brier": 0.1454,
-          "logloss": 0.4581
+          "roc_auc": 0.6973,
+          "pr_auc": 0.3565,
+          "brier": 0.1444,
+          "logloss": 0.4544,
+          "best_f1": 0.4168,
+          "best_threshold": 0.2383
         },
         "21-50": {
           "samples": 3261,
           "positives": 538,
           "pos_rate": 0.165,
-          "roc_auc": 0.6361,
-          "pr_auc": 0.261,
-          "brier": 0.1351,
-          "logloss": 0.4372
+          "roc_auc": 0.6345,
+          "pr_auc": 0.247,
+          "brier": 0.1349,
+          "logloss": 0.4362,
+          "best_f1": 0.3314,
+          "best_threshold": 0.2252
         },
         ">50": {
           "samples": 703,
           "positives": 98,
           "pos_rate": 0.1394,
-          "roc_auc": 0.6978,
-          "pr_auc": 0.2698,
-          "brier": 0.1242,
-          "logloss": 0.4157
+          "roc_auc": 0.6876,
+          "pr_auc": 0.2414,
+          "brier": 0.1248,
+          "logloss": 0.4177,
+          "best_f1": 0.3799,
+          "best_threshold": 0.3005
         }
       },
       "by_shop": {
@@ -384,74 +460,91 @@
             "samples": 79439,
             "positives": 5507,
             "pos_rate": 0.0693,
-            "roc_auc": 0.7639,
-            "pr_auc": 0.1825,
+            "roc_auc": 0.7656,
+            "pr_auc": 0.1822,
             "brier": 0.0603,
-            "logloss": 0.221
+            "logloss": 0.2208,
+            "best_f1": 0.2654,
+            "best_threshold": 0.1589,
+            "f1_at_val_threshold": 0.2615
           },
           "by_prefix_len": {
             "1": {
               "samples": 36000,
               "positives": 929,
               "pos_rate": 0.0258,
-              "roc_auc": 0.6669,
-              "pr_auc": 0.0774,
-              "brier": 0.0243,
-              "logloss": 0.1099
+              "roc_auc": 0.6716,
+              "pr_auc": 0.0773,
+              "brier": 0.0244,
+              "logloss": 0.11,
+              "best_f1": 0.1767,
+              "best_threshold": 0.0928
             },
             "2": {
               "samples": 12010,
               "positives": 869,
               "pos_rate": 0.0724,
               "roc_auc": 0.6788,
-              "pr_auc": 0.1282,
+              "pr_auc": 0.131,
               "brier": 0.0653,
-              "logloss": 0.2457
+              "logloss": 0.2462,
+              "best_f1": 0.21,
+              "best_threshold": 0.0967
             },
             "3-5": {
               "samples": 13585,
               "positives": 1143,
               "pos_rate": 0.0841,
-              "roc_auc": 0.7148,
-              "pr_auc": 0.1626,
-              "brier": 0.0738,
-              "logloss": 0.2659
+              "roc_auc": 0.7114,
+              "pr_auc": 0.1594,
+              "brier": 0.0741,
+              "logloss": 0.2669,
+              "best_f1": 0.2467,
+              "best_threshold": 0.1503
             },
             "6-10": {
               "samples": 8327,
               "positives": 1056,
               "pos_rate": 0.1268,
-              "roc_auc": 0.6754,
-              "pr_auc": 0.2075,
-              "brier": 0.1062,
-              "logloss": 0.3574
+              "roc_auc": 0.6803,
+              "pr_auc": 0.2061,
+              "brier": 0.106,
+              "logloss": 0.356,
+              "best_f1": 0.3057,
+              "best_threshold": 0.168
             },
             "11-20": {
               "samples": 5553,
               "positives": 874,
               "pos_rate": 0.1574,
-              "roc_auc": 0.6306,
-              "pr_auc": 0.2335,
-              "brier": 0.1293,
-              "logloss": 0.4219
+              "roc_auc": 0.6428,
+              "pr_auc": 0.2431,
+              "brier": 0.1283,
+              "logloss": 0.4179,
+              "best_f1": 0.3235,
+              "best_threshold": 0.2009
             },
             "21-50": {
               "samples": 3261,
               "positives": 538,
               "pos_rate": 0.165,
-              "roc_auc": 0.6361,
-              "pr_auc": 0.261,
-              "brier": 0.1351,
-              "logloss": 0.4372
+              "roc_auc": 0.6345,
+              "pr_auc": 0.247,
+              "brier": 0.1349,
+              "logloss": 0.4362,
+              "best_f1": 0.3314,
+              "best_threshold": 0.2252
             },
             ">50": {
               "samples": 703,
               "positives": 98,
               "pos_rate": 0.1394,
-              "roc_auc": 0.6978,
-              "pr_auc": 0.2698,
-              "brier": 0.1242,
-              "logloss": 0.4157
+              "roc_auc": 0.6876,
+              "pr_auc": 0.2414,
+              "brier": 0.1248,
+              "logloss": 0.4177,
+              "best_f1": 0.3799,
+              "best_threshold": 0.3005
             }
           }
         },
@@ -460,56 +553,69 @@
             "samples": 59224,
             "positives": 20160,
             "pos_rate": 0.3404,
-            "roc_auc": 0.6028,
-            "pr_auc": 0.4057,
-            "brier": 0.2174,
-            "logloss": 0.6249
+            "roc_auc": 0.6036,
+            "pr_auc": 0.4085,
+            "brier": 0.2172,
+            "logloss": 0.6244,
+            "best_f1": 0.5213,
+            "best_threshold": 0.2597,
+            "f1_at_val_threshold": 0.5211
           },
           "by_prefix_len": {
             "1": {
               "samples": 12000,
               "positives": 3450,
               "pos_rate": 0.2875,
-              "roc_auc": 0.5162,
-              "pr_auc": 0.2925,
-              "brier": 0.2048,
-              "logloss": 0.5997
+              "roc_auc": 0.5233,
+              "pr_auc": 0.2959,
+              "brier": 0.2045,
+              "logloss": 0.599,
+              "best_f1": 0.4479,
+              "best_threshold": 0.2549
             },
             "2": {
               "samples": 10942,
               "positives": 3450,
               "pos_rate": 0.3153,
-              "roc_auc": 0.5804,
-              "pr_auc": 0.3809,
-              "brier": 0.2108,
-              "logloss": 0.612
+              "roc_auc": 0.5827,
+              "pr_auc": 0.3848,
+              "brier": 0.2109,
+              "logloss": 0.612,
+              "best_f1": 0.4834,
+              "best_threshold": 0.2138
             },
             "3-5": {
               "samples": 21014,
               "positives": 7194,
               "pos_rate": 0.3423,
-              "roc_auc": 0.6085,
-              "pr_auc": 0.4083,
-              "brier": 0.2158,
-              "logloss": 0.6208
+              "roc_auc": 0.6086,
+              "pr_auc": 0.4108,
+              "brier": 0.2157,
+              "logloss": 0.6206,
+              "best_f1": 0.5394,
+              "best_threshold": 0.2584
             },
             "6-10": {
               "samples": 14396,
               "positives": 5678,
               "pos_rate": 0.3944,
-              "roc_auc": 0.5483,
-              "pr_auc": 0.4187,
-              "brier": 0.2335,
-              "logloss": 0.6579
+              "roc_auc": 0.5499,
+              "pr_auc": 0.4202,
+              "brier": 0.2331,
+              "logloss": 0.6567,
+              "best_f1": 0.5855,
+              "best_threshold": 0.3148
             },
             "11-20": {
               "samples": 872,
               "positives": 388,
               "pos_rate": 0.445,
-              "roc_auc": 0.49,
-              "pr_auc": 0.4366,
-              "brier": 0.2477,
-              "logloss": 0.6886
+              "roc_auc": 0.5281,
+              "pr_auc": 0.4619,
+              "brier": 0.2468,
+              "logloss": 0.6867,
+              "best_f1": 0.6171,
+              "best_threshold": 0.4127
             }
           }
         }
@@ -518,11 +624,11 @@
   },
   "onnx_parity_check": {
     "onnx_path": "models\\intent_v1.onnx",
-    "onnx_size_bytes": 101732,
+    "onnx_size_bytes": 108050,
     "samples_verified": 1000,
-    "max_abs_diff": 1.043081283569336e-07,
-    "mean_abs_diff": 2.212822458602659e-08,
-    "max_abs_diff_batch1": 1.862645149230957e-09,
+    "max_abs_diff": 8.940696716308594e-08,
+    "mean_abs_diff": 2.1490269119794903e-08,
+    "max_abs_diff_batch1": 2.2351741790771484e-08,
     "tolerance": 0.0001,
     "passed": true
   },
@@ -534,27 +640,32 @@
       "samples": 138658,
       "positives": 25974,
       "pos_rate": 0.1873,
-      "roc_auc": 0.7776,
-      "pr_auc": 0.3801,
+      "roc_auc": 0.7777,
+      "pr_auc": 0.3804,
       "brier": 0.1298,
-      "logloss": 0.4005
+      "logloss": 0.4005,
+      "best_f1": 0.4755,
+      "best_threshold": 0.2394
     },
     "test_overall": {
       "samples": 138663,
       "positives": 25667,
       "pos_rate": 0.1851,
-      "roc_auc": 0.784,
-      "pr_auc": 0.3816,
-      "brier": 0.1276,
-      "logloss": 0.3942
+      "roc_auc": 0.7845,
+      "pr_auc": 0.3822,
+      "brier": 0.1275,
+      "logloss": 0.3939,
+      "best_f1": 0.4815,
+      "best_threshold": 0.2333,
+      "f1_at_val_threshold": 0.481
     },
     "onnx_parity_check": {
       "onnx_path": "models\\intent_transformer_full.onnx",
       "onnx_size_bytes": 133908,
       "samples_verified": 1000,
-      "max_abs_diff": 8.940696716308594e-08,
-      "mean_abs_diff": 2.1867453625645794e-08,
-      "max_abs_diff_batch1": 2.421438694000244e-08,
+      "max_abs_diff": 1.043081283569336e-07,
+      "mean_abs_diff": 2.3055822140349846e-08,
+      "max_abs_diff_batch1": 3.725290298461914e-09,
       "tolerance": 0.0001,
       "passed": true
     }

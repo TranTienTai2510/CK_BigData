@@ -40,7 +40,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import numpy as np  # noqa: E402
 import pyarrow.parquet as pq  # noqa: E402
 from sklearn.ensemble import HistGradientBoostingClassifier  # noqa: E402
-from sklearn.metrics import average_precision_score, brier_score_loss, log_loss, roc_auc_score  # noqa: E402
+from sklearn.metrics import (  # noqa: E402
+    average_precision_score,
+    brier_score_loss,
+    log_loss,
+    precision_recall_curve,
+    roc_auc_score,
+)
 from ml import features as FT  # noqa: E402
 from ml.prefixes import K_BUCKETS  # noqa: E402
 
@@ -54,15 +60,41 @@ def k_to_bucket(k):
     return BUCKET_NAMES[-1]
 
 
-def safe_metrics(y_true, y_prob):
+def compute_best_f1(y_true, y_prob, threshold=None):
+    """Compute F1 at a fixed threshold or sweep PR curve for optimal (best_f1, best_threshold)."""
+    y_true = np.asarray(y_true, dtype=np.int32)
+    y_prob = np.asarray(y_prob, dtype=np.float64)
+    pos = int(y_true.sum())
+    if len(y_true) == 0 or pos == 0 or pos == len(y_true):
+        return None, None
+    if threshold is not None:
+        pred = (y_prob >= float(threshold)).astype(np.int32)
+        tp = int(np.sum((pred == 1) & (y_true == 1)))
+        fp = int(np.sum((pred == 1) & (y_true == 0)))
+        fn = int(np.sum((pred == 0) & (y_true == 1)))
+        denom = 2 * tp + fp + fn
+        f1 = (2.0 * tp / denom) if denom > 0 else 0.0
+        return round(float(f1), 4), round(float(threshold), 4)
+    prec, rec, thr = precision_recall_curve(y_true, y_prob)
+    denom = prec[:-1] + rec[:-1]
+    f1s = np.where(denom > 0, 2.0 * prec[:-1] * rec[:-1] / np.maximum(denom, 1e-12), 0.0)
+    if len(f1s) == 0:
+        return 0.0, 0.5
+    best_i = int(np.argmax(f1s))
+    return round(float(f1s[best_i]), 4), round(float(thr[best_i]), 4)
+
+
+def safe_metrics(y_true, y_prob, val_threshold=None):
     y_true = np.asarray(y_true, dtype=np.int32)
     y_prob = np.clip(np.asarray(y_prob, dtype=np.float64), 1e-7, 1.0 - 1e-7)
     n = int(len(y_true))
     pos = int(y_true.sum())
     if n == 0 or pos == 0 or pos == n:
         return {"samples": n, "positives": pos, "pos_rate": round(pos / max(n, 1), 4),
-                "roc_auc": None, "pr_auc": None, "brier": None, "logloss": None}
-    return {
+                "roc_auc": None, "pr_auc": None, "brier": None, "logloss": None,
+                "best_f1": None, "best_threshold": None}
+    best_f1, best_thr = compute_best_f1(y_true, y_prob)
+    out = {
         "samples": n,
         "positives": pos,
         "pos_rate": round(pos / n, 4),
@@ -70,7 +102,13 @@ def safe_metrics(y_true, y_prob):
         "pr_auc": round(float(average_precision_score(y_true, y_prob)), 4),
         "brier": round(float(brier_score_loss(y_true, y_prob)), 4),
         "logloss": round(float(log_loss(y_true, y_prob)), 4),
+        "best_f1": best_f1,
+        "best_threshold": best_thr,
     }
+    if val_threshold is not None:
+        f1_at_val, _ = compute_best_f1(y_true, y_prob, threshold=val_threshold)
+        out["f1_at_val_threshold"] = f1_at_val
+    return out
 
 
 # ---------------------------------------------------------------- dataset expansion (sessions -> prefix samples)
@@ -88,6 +126,125 @@ TABULAR_FEATURE_NAMES = (
     "sec_per_step", "cat_switch_rate",
 )
 CATEGORICAL_COLS = list(range(8))
+
+
+def extract_tabular_and_markov(steps_col, labels_col, shop_idx_col, shop_id_col, ks_per_sess):
+    """Build 32 tabular prefix features and Markov transition tuples for selected (session, k) pairs."""
+    total = 0
+    for i, st in enumerate(steps_col):
+        ks_sel = ks_per_sess[i]
+        total += len(ks_sel) if ks_sel is not None else len(st)
+
+    X = np.zeros((total, len(TABULAR_FEATURE_NAMES)), dtype=np.float32)
+    y = np.zeros(total, dtype=np.int32)
+    k_arr = np.zeros(total, dtype=np.int32)
+    shops = np.empty(total, dtype=object)
+    m_shop = np.zeros(total, dtype=np.int32)
+    m_t1 = np.zeros(total, dtype=np.int32)
+    m_t2 = np.zeros(total, dtype=np.int32)
+    m_t3 = np.zeros(total, dtype=np.int32)
+    m_cat = np.zeros(total, dtype=np.int32)
+    m_cart = np.zeros(total, dtype=np.int32)
+    m_kb = np.zeros(total, dtype=np.int32)
+    m_trans = np.zeros((total, 16), dtype=np.int16)
+
+    row = 0
+    for s_i, st in enumerate(steps_col):
+        n = len(st)
+        if n == 0:
+            continue
+        lbl = int(labels_col[s_i])
+        sidx = int(shop_idx_col[s_i])
+        sname = str(shop_id_col[s_i])
+        ks_sel = ks_per_sess[s_i]
+        ks_set = set(ks_sel) if ks_sel is not None else None
+
+        first = st[0]
+        first_type = int(first["type_idx"])
+        first_cat = int(first["cat_idx"])
+        first_lp = math.log1p(max(float(first["price"]), 0.0))
+
+        prev_type, prev_cat, prev_lp, prev_ldt = 0, 0, 0.0, 0.0
+        prev2_type = 0
+        lp_sum, lp_max, lp_min = 0.0, -1e9, 1e9
+        ldt_sum, ldt_max = 0.0, 0.0
+        cat_switches = 0
+        trans_counts = np.zeros(16, dtype=np.int16)
+
+        for idx_zero, step in enumerate(st):
+            k = idx_zero + 1
+            t_idx = int(step["type_idx"])
+            c_idx = int(step["cat_idx"])
+            b_idx = int(step["brand_idx"])
+            price = float(step["price"])
+            qty = int(step["qty"])
+            dt_ms = int(step["dt_prev_ms"])
+            tf_ms = int(step["t_first_ms"])
+            same = int(step["same_prod"])
+            n_view = int(step["n_view"])
+            n_add = int(step["n_add"])
+            n_rem = int(step["n_remove"])
+            cart_u = int(step["cart_units"])
+            pos = int(step["pos"])
+
+            lp = math.log1p(max(price, 0.0))
+            lq = math.log1p(max(qty, 0))
+            ldt = math.log1p(dt_ms / 1000.0)
+            ltf = math.log1p(tf_ms / 1000.0)
+            lnv = math.log1p(n_view)
+            lna = math.log1p(n_add)
+            lnr = math.log1p(n_rem)
+            scu = math.copysign(math.log1p(abs(cart_u)), cart_u) if cart_u else 0.0
+            lpos = math.log1p(pos)
+
+            lp_sum += lp
+            if lp > lp_max:
+                lp_max = lp
+            if lp < lp_min:
+                lp_min = lp
+            ldt_sum += ldt
+            if ldt > ldt_max:
+                ldt_max = ldt
+            if k > 1 and c_idx != prev_cat:
+                cat_switches += 1
+            if k > 1:
+                a_t = min(max(prev_type - FT.FIRST_IDX, 0), 3)
+                b_t = min(max(t_idx - FT.FIRST_IDX, 0), 3)
+                trans_counts[a_t * 4 + b_t] += 1
+
+            if ks_set is None or k in ks_set:
+                has_cart = 1 if cart_u > 0 else 0
+                X[row] = (
+                    sidx, t_idx, c_idx, b_idx, prev_type, prev_cat, first_type, first_cat,
+                    lp, lq, ldt, ltf, float(same), lnv, lna, lnr, scu, lpos,
+                    prev_lp, prev_ldt, first_lp,
+                    lp_sum / k, lp_max, lp_min,
+                    ldt_sum / k, ldt_max,
+                    n_add / k, n_view / k, n_rem / max(n_add, 1), float(has_cart),
+                    math.log1p((tf_ms / 1000.0) / k), cat_switches / max(k - 1, 1),
+                )
+                y[row] = lbl
+                k_arr[row] = k
+                shops[row] = sname
+                m_shop[row] = sidx
+                m_t1[row] = t_idx
+                m_t2[row] = prev_type
+                m_t3[row] = prev2_type
+                m_cat[row] = c_idx
+                m_cart[row] = has_cart
+                m_kb[row] = 0 if k == 1 else (1 if k == 2 else (2 if k <= 5 else (3 if k <= 10 else 4)))
+                m_trans[row] = trans_counts
+                row += 1
+
+            prev2_type = prev_type
+            prev_type, prev_cat, prev_lp, prev_ldt = t_idx, c_idx, lp, ldt
+
+    return {
+        "X": X[:row], "y": y[:row], "k": k_arr[:row], "shop_id": shops[:row],
+        "markov": (m_shop[:row], m_t1[:row], m_t2[:row], m_t3[:row], m_cat[:row], m_cart[:row], m_kb[:row],
+                   m_trans[:row]),
+        "n_sessions": int(len(steps_col)),
+    }
 
 
 def load_prefix_samples(prefix_dir, shop_filter=None, max_sessions_per_split=200000, max_k_per_session=15, seed=42):
@@ -127,7 +284,6 @@ def load_prefix_samples(prefix_dir, shop_filter=None, max_sessions_per_split=200
         shop_id_col = sdf["shop_id"].astype(str).tolist()
 
         ks_per_sess = []
-        total = 0
         for st in steps_col:
             n = len(st)
             if max_k_per_session and n > max_k_per_session:
@@ -135,124 +291,10 @@ def load_prefix_samples(prefix_dir, shop_filter=None, max_sessions_per_split=200
                 cand = sorted(set([1, min(2, n), n] + rng.choice(range(1, n + 1), size=max_k_per_session,
                                                                  replace=False).tolist()))
                 ks_per_sess.append(cand)
-                total += len(cand)
             else:
                 ks_per_sess.append(None)
-                total += n
 
-        X = np.zeros((total, len(TABULAR_FEATURE_NAMES)), dtype=np.float32)
-        y = np.zeros(total, dtype=np.int32)
-        k_arr = np.zeros(total, dtype=np.int32)
-        shops = np.empty(total, dtype=object)
-        # Markov discrete keys per sample: (shop_idx, t_last, t_prev, t_prev2, c_last, has_cart, k_bucket_idx, trans_ll_key)
-        m_shop = np.zeros(total, dtype=np.int32)
-        m_t1 = np.zeros(total, dtype=np.int32)
-        m_t2 = np.zeros(total, dtype=np.int32)
-        m_t3 = np.zeros(total, dtype=np.int32)
-        m_cat = np.zeros(total, dtype=np.int32)
-        m_cart = np.zeros(total, dtype=np.int32)
-        m_kb = np.zeros(total, dtype=np.int32)
-        # Transition counts inside prefix (from type a -> type b, types 3..6 mapped to 0..3)
-        m_trans = np.zeros((total, 16), dtype=np.int16)
-
-        row = 0
-        for s_i, st in enumerate(steps_col):
-            n = len(st)
-            if n == 0:
-                continue
-            lbl = labels_col[s_i]
-            sidx = shop_idx_col[s_i]
-            sname = shop_id_col[s_i]
-            ks_sel = ks_per_sess[s_i]
-            ks_set = set(ks_sel) if ks_sel is not None else None
-
-            # Running accumulators along the session prefix k = 1..n
-            first = st[0]
-            first_type = int(first["type_idx"])
-            first_cat = int(first["cat_idx"])
-            first_lp = math.log1p(max(float(first["price"]), 0.0))
-
-            prev_type, prev_cat, prev_lp, prev_ldt = 0, 0, 0.0, 0.0
-            prev2_type = 0
-            lp_sum, lp_max, lp_min = 0.0, -1e9, 1e9
-            ldt_sum, ldt_max = 0.0, 0.0
-            cat_switches = 0
-            trans_counts = np.zeros(16, dtype=np.int16)
-
-            for idx_zero, step in enumerate(st):
-                k = idx_zero + 1
-                t_idx = int(step["type_idx"])
-                c_idx = int(step["cat_idx"])
-                b_idx = int(step["brand_idx"])
-                price = float(step["price"])
-                qty = int(step["qty"])
-                dt_ms = int(step["dt_prev_ms"])
-                tf_ms = int(step["t_first_ms"])
-                same = int(step["same_prod"])
-                n_view = int(step["n_view"])
-                n_add = int(step["n_add"])
-                n_rem = int(step["n_remove"])
-                cart_u = int(step["cart_units"])
-                pos = int(step["pos"])
-
-                lp = math.log1p(max(price, 0.0))
-                lq = math.log1p(max(qty, 0))
-                ldt = math.log1p(dt_ms / 1000.0)
-                ltf = math.log1p(tf_ms / 1000.0)
-                lnv = math.log1p(n_view)
-                lna = math.log1p(n_add)
-                lnr = math.log1p(n_rem)
-                scu = math.copysign(math.log1p(abs(cart_u)), cart_u) if cart_u else 0.0
-                lpos = math.log1p(pos)
-
-                lp_sum += lp
-                if lp > lp_max:
-                    lp_max = lp
-                if lp < lp_min:
-                    lp_min = lp
-                ldt_sum += ldt
-                if ldt > ldt_max:
-                    ldt_max = ldt
-                if k > 1 and c_idx != prev_cat:
-                    cat_switches += 1
-                if k > 1:
-                    a_t = min(max(prev_type - FT.FIRST_IDX, 0), 3)
-                    b_t = min(max(t_idx - FT.FIRST_IDX, 0), 3)
-                    trans_counts[a_t * 4 + b_t] += 1
-
-                if ks_set is None or k in ks_set:
-                    has_cart = 1 if cart_u > 0 else 0
-                    X[row] = (
-                        sidx, t_idx, c_idx, b_idx, prev_type, prev_cat, first_type, first_cat,
-                        lp, lq, ldt, ltf, float(same), lnv, lna, lnr, scu, lpos,
-                        prev_lp, prev_ldt, first_lp,
-                        lp_sum / k, lp_max, lp_min,
-                        ldt_sum / k, ldt_max,
-                        n_add / k, n_view / k, n_rem / max(n_add, 1), float(has_cart),
-                        math.log1p((tf_ms / 1000.0) / k), cat_switches / max(k - 1, 1),
-                    )
-                    y[row] = lbl
-                    k_arr[row] = k
-                    shops[row] = sname
-                    m_shop[row] = sidx
-                    m_t1[row] = t_idx
-                    m_t2[row] = prev_type
-                    m_t3[row] = prev2_type
-                    m_cat[row] = c_idx
-                    m_cart[row] = has_cart
-                    m_kb[row] = 0 if k == 1 else (1 if k == 2 else (2 if k <= 5 else (3 if k <= 10 else 4)))
-                    m_trans[row] = trans_counts
-                    row += 1
-
-                prev2_type = prev_type
-                prev_type, prev_cat, prev_lp, prev_ldt = t_idx, c_idx, lp, ldt
-
-        splits[split] = {
-            "X": X[:row], "y": y[:row], "k": k_arr[:row], "shop_id": shops[:row],
-            "markov": (m_shop[:row], m_t1[:row], m_t2[:row], m_t3[:row], m_cat[:row], m_cart[:row], m_kb[:row],
-                       m_trans[:row]),
-            "n_sessions": int(len(sdf)),
-        }
+        splits[split] = extract_tabular_and_markov(steps_col, labels_col, shop_idx_col, shop_id_col, ks_per_sess)
     return splits
 
 
@@ -463,16 +505,19 @@ def fit_gbm(X_train, y_train, seed=42):
 
 
 # ---------------------------------------------------------------- Evaluation & tables
-def evaluate_predictions(y_true, y_prob, k_arr, shop_arr):
+def evaluate_predictions(y_true, y_prob, k_arr, shop_arr, val_eval=None):
     buckets = np.array([k_to_bucket(int(k)) for k in k_arr], dtype=object)
-    res = {"overall": safe_metrics(y_true, y_prob), "by_prefix_len": {}, "by_shop": {}}
+    val_thr = val_eval["overall"].get("best_threshold") if val_eval else None
+    res = {"overall": safe_metrics(y_true, y_prob, val_threshold=val_thr), "by_prefix_len": {}, "by_shop": {}}
     for b in BUCKET_NAMES:
         m = (buckets == b)
         if m.any():
             res["by_prefix_len"][b] = safe_metrics(y_true[m], y_prob[m])
     for shop in sorted(set(shop_arr.tolist())):
         ms = (shop_arr == shop)
-        res["by_shop"][shop] = {"overall": safe_metrics(y_true[ms], y_prob[ms]), "by_prefix_len": {}}
+        s_thr = val_eval["by_shop"].get(shop, {}).get("overall", {}).get("best_threshold") if val_eval else None
+        res["by_shop"][shop] = {"overall": safe_metrics(y_true[ms], y_prob[ms], val_threshold=s_thr),
+                                "by_prefix_len": {}}
         for b in BUCKET_NAMES:
             msb = ms & (buckets == b)
             if msb.any():

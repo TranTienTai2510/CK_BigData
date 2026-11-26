@@ -21,7 +21,7 @@ data/fx/DEXBZUS.csv  (optional) daily BRL per USD from FRED, for Olist USD conve
         └─ ml/prefixes.py ─► data/prefix/{feature_spec.json, sessions/shop_id=<shop>/split=<split>/, _report.json}
               │
               ├─ ml/baselines.py ─► data/prefix/_baselines.json   (Markov + GBM baselines, AUC/PR-AUC by prefix length)
-              └─ ml/train_dl.py  ─► models/{intent_v1.onnx, model_card.json, feature_spec.json}, data/prefix/_dl_ablation.json
+              └─ ml/train_dl.py  ─► models/{intent_v1.onnx, model_card.json, feature_spec.json}, data/prefix/{_dl_ablation.json, _model_benchmark.json}
 ```
 
 ## Run (Python 3.10+, `pip install pyspark==3.5.5`, JDK 17; stop the Docker stack first)
@@ -46,9 +46,10 @@ python ml/train_dl.py              --prefix  data/prefix  --out-dir models --rep
 `ml/prefixes.py` builds the shared vocabulary (`data/prefix/feature_spec.json`, from the `train` split only) and the
 prefix dataset (`data/prefix/sessions/shop_id=<shop>/split=<split>/`, cut at `cut_seq_no`) used by training and Q2
 (`ml/features.py`). `ml/baselines.py` trains the Week 1 Markov and GBM baselines on `train` and outputs ROC-AUC and
-PR-AUC tables by prefix length `k` on `val` and `test`. `ml/train_dl.py` trains the Week 2 GRU and Transformer models
-with class-weighted loss and Platt calibration, runs the ablation suite, and exports `models/intent_v1.onnx` +
-`models/model_card.json` + `models/feature_spec.json` (handover G4).
+PR-AUC tables by prefix length `k` on `val` and `test`. `ml/train_dl.py` runs the unified Binary Classification (Session-prefix Purchase Intent Prediction) benchmark across
+Markov, HistGBM, GRU, Hybrid GRU+Wide&Deep, Causal TCN, Bi-LSTM+Attention, MLP-Mixer, and Causal Transformer,
+develops the improved `bilstm_attention_v2` variant, runs the ablation suite, and exports the winning Champion to
+`models/intent_v1.onnx` + `models/model_card.json` + `models/feature_spec.json` (handover G4), plus `_model_benchmark.json`.
 
 ## Tests without the real data (fixtures with independent ground truth)
 
