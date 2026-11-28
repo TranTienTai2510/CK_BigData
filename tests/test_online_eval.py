@@ -10,6 +10,9 @@ import json
 import math
 import os
 import sys
+import urllib.error
+from argparse import Namespace
+from unittest.mock import patch
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
@@ -23,9 +26,11 @@ from analysis.live import (
     assign_prefix_bucket,
     compute_pr_auc,
     compute_roc_auc,
+    cmd_eval,
     evaluate_online_pairs,
+    query_pipeline_heartbeat,
 )
-from streaming.q2_intent import Q2Processor
+from streaming.q2_intent import _route_model
 
 
 def assert_check(name, got, expected):
@@ -75,50 +80,38 @@ def test_online_evaluation_metrics():
 
 def test_ab_testing_champion_vs_challenger():
     print("\n--- 2. Testing Champion vs Challenger A/B Routing ---")
-    spec_path = "models/feature_spec.json"
     champ_path = "models/intent_v1.onnx"
     challenger_path = "models/intent_transformer_full.onnx"
+    routes = [
+        _route_model(
+            "synthetic" if session_id % 2 == 0 else "rees46_cosmetics",
+            session_id,
+            champ_path,
+            "intent_v1",
+            challenger_path,
+            True,
+        )
+        for session_id in range(1, 101)
+    ]
+    repeated_routes = [
+        _route_model(
+            "synthetic" if session_id % 2 == 0 else "rees46_cosmetics",
+            session_id,
+            champ_path,
+            "intent_v1",
+            challenger_path,
+            True,
+        )
+        for session_id in range(1, 101)
+    ]
+    assert_check("route_is_deterministic", routes == repeated_routes, True)
 
-    processor = Q2Processor(
-        spec_path=spec_path,
-        model_path=champ_path,
-        model_ver="intent_v1",
-        challenger_path=challenger_path,
-        ab_test=True,
-    )
-
-    # Create events for 20 distinct sessions
-    records = []
-    for sess_id in range(1, 21):
-        records.append({
-            "shop_id": "synthetic" if sess_id % 2 == 0 else "rees46_cosmetics",
-            "session_id": sess_id,
-            "seq_no": 1,
-            "event_type": "page_view",
-            "product_id": 100 + sess_id,
-            "category": "c",
-            "brand": "b",
-            "price": 20.0,
-            "qty": None,
-            "amount_usd": None,
-            "event_ts": "2024-01-01 10:00:00.000",
-            "ts_ms": 1704103200000,
-        })
-
-    intents, _ = processor.process_records(records, force_close=True)
-    assert_check("ab_intents_emitted", len(intents), 20)
-
-    champ_count = sum(1 for it in intents if it["model_ver"] == "intent_v1")
-    chall_count = sum(1 for it in intents if it["model_ver"] == "intent_transformer_v1")
+    champ_count = sum(1 for _, version in routes if version == "intent_v1")
+    chall_count = sum(1 for _, version in routes if version == "intent_transformer_v1")
     print(f"A/B Split: Champion(intent_v1)={champ_count}, Challenger(intent_transformer_v1)={chall_count}")
 
-    # Both models should receive a share of the traffic
+    assert_check("all_sessions_routed", champ_count + chall_count, 100)
     assert_check("both_models_received_traffic", champ_count > 0 and chall_count > 0, True)
-    assert_check("sum_of_models_equals_total", champ_count + chall_count, 20)
-
-    # Probabilities of both models must be valid probabilities
-    for it in intents:
-        assert 0.0 <= it["prob"] <= 1.0
 
 
 def test_pipeline_monitor_health():
@@ -148,10 +141,61 @@ def test_pipeline_monitor_health():
     assert_check("detects_stall", health_c["status"], "STALL")
 
 
+def test_live_commands_use_observed_data():
+    print("\n--- 4. Testing live commands fail closed and use ClickHouse metrics ---")
+    with patch("analysis.live.query_clickhouse_pairs", side_effect=urllib.error.URLError("offline")):
+        try:
+            cmd_eval(Namespace(
+                snapshot="",
+                model_card=os.path.join(ROOT_DIR, "models", "model_card.json"),
+                ch_host="localhost",
+                ch_port=8123,
+                ch_user="default",
+                ch_pass="clickstream",
+                model_ver="intent_v1",
+                out="",
+            ))
+        except RuntimeError as exc:
+            assert "valid --snapshot" in str(exc)
+        else:
+            raise AssertionError("offline ClickHouse must not produce synthetic evaluation results")
+
+    with patch("analysis.live.query_clickhouse_pairs", return_value=[]):
+        try:
+            cmd_eval(Namespace(
+                snapshot="",
+                model_card=os.path.join(ROOT_DIR, "models", "model_card.json"),
+                ch_host="localhost",
+                ch_port=8123,
+                ch_user="default",
+                ch_pass="clickstream",
+                model_ver="intent_v1",
+                out="",
+            ))
+        except RuntimeError as exc:
+            assert "No online prediction" in str(exc)
+        else:
+            raise AssertionError("empty ClickHouse results must not produce a success-shaped evaluation")
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b"12.5\t1.25\n"
+
+    with patch("urllib.request.urlopen", return_value=Response()):
+        assert query_pipeline_heartbeat() == (12.5, 1.25)
+
+
 def main():
     test_online_evaluation_metrics()
     test_ab_testing_champion_vs_challenger()
     test_pipeline_monitor_health()
+    test_live_commands_use_observed_data()
     print("\nALL WEEK 4 & G6 TESTS PASS!")
 
 

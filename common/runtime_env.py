@@ -118,6 +118,18 @@ def configure(verbose=True):
 
 
 if __name__ == "__main__":   # python -m common.runtime_env  -> diagnose only
+    if os.name != "nt":
+        bad = check_pyspark()
+        print(f"python      -> {sys.executable}")
+        try:
+            import pyspark
+            print(f"pyspark     -> {pyspark.__version__}")
+        except ImportError:
+            pass
+        print("JDK/Hadoop  -> not required for Linux/macOS")
+        print("OK" if not bad else f"PROBLEMS:\n  - {bad}")
+        sys.exit(1 if bad else 0)
+
     j, h, p = resolve(os.environ)
     bad = check_pyspark()
     if bad:

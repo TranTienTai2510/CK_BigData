@@ -190,12 +190,13 @@ class SessionState:
     for a missing one, the gap is skipped (n_skipped) -- only then can the stream differ from batch.
 
     Flags: `cut` = a checkout/purchase was processed (no prediction from that event on, as in training);
-    `closed` = set by Q2 when the session times out (later events are ignored).
+    `last_pred_seq_no` is the latest emitted prefix, while `last_seq_no` includes post-cut events.
     """
     MAX_PENDING = 64
     _FIELDS = ("shop_id", "next_seq", "pending", "cut", "cut_seq_no", "closed", "window", "prev_ts", "first_ts",
                "prev_product", "n_view", "n_add", "n_remove", "cart_units", "pos", "n_dup", "n_skipped",
-               "n_after_close")
+               "n_after_close", "last_pred_seq_no", "last_seq_no", "last_event_ts_ms",
+               "last_activity_ts_ms", "last_pred_event_ts_ms")
 
     def __init__(self, shop_id):
         self.shop_id = shop_id
@@ -210,6 +211,12 @@ class SessionState:
         self.prev_product = None
         self.n_view = self.n_add = self.n_remove = self.cart_units = self.pos = 0
         self.n_dup = self.n_skipped = self.n_after_close = 0
+        self.last_pred_seq_no = None
+        self.last_seq_no = None
+        self.last_event_ts_ms = None
+        self.last_activity_ts_ms = None
+        self.last_pred_event_ts_ms = None
+        self.emitted_event_ts_ms = {}
 
     # ---- serialisation (state store)
     def to_json(self):
@@ -223,9 +230,11 @@ class SessionState:
         d = json.loads(s)
         st = cls(d["shop_id"])
         for k in cls._FIELDS:
-            setattr(st, k, d[k])
+            if k in d:
+                setattr(st, k, d[k])
         st.pending = {int(seq): tuple(e) for seq, e in d["pending"]}
         st.window = [tuple(x) for x in d["window"]]
+        st.emitted_event_ts_ms = {}
         return st
 
     # ---- processing
@@ -234,6 +243,7 @@ class SessionState:
         (seq_no, k, tensor) for every newly processed pre-cut event (emit="all"), only the latest one
         (emit="last") or none (emit="none"); k = prefix length (number of events used so far)."""
         max_pending = self.MAX_PENDING if max_pending is None else max_pending
+        self.emitted_event_ts_ms = {}
         for ev in events:
             seq = int(_get(ev, "seq_no"))
             if self.closed:
@@ -242,7 +252,14 @@ class SessionState:
             if seq < self.next_seq or seq in self.pending:
                 self.n_dup += 1
                 continue
-            self.pending[seq] = _norm_event(ev)
+            normalized = _norm_event(ev)
+            event_ts_ms = normalized[-1]
+            if self.last_seq_no is None or seq > self.last_seq_no:
+                self.last_seq_no = seq
+                self.last_event_ts_ms = event_ts_ms
+            if self.last_activity_ts_ms is None or event_ts_ms > self.last_activity_ts_ms:
+                self.last_activity_ts_ms = event_ts_ms
+            self.pending[seq] = normalized
         sidx, max_len = shop_index(spec, self.shop_id), spec["max_len"]
         out, last = [], None
         while self.pending:
@@ -255,6 +272,7 @@ class SessionState:
             seq = self.next_seq
             ev = self.pending.pop(seq)
             self.next_seq += 1
+            event_ts_ms = ev[-1]
             if self.cut:
                 continue
             if ev[0] in CUT_TYPES:
@@ -262,11 +280,17 @@ class SessionState:
                 continue
             self.window.append(self._step(seq, ev, spec))
             del self.window[:-max_len]
-            last = (seq, self.pos)
+            last = (seq, self.pos, event_ts_ms)
             if emit == "all":   # tensor now: the window moves on with the next event
                 out.append((seq, self.pos, window_to_tensor(self.window, sidx, max_len)))
+                self.last_pred_seq_no = seq
+                self.last_pred_event_ts_ms = event_ts_ms
+                self.emitted_event_ts_ms[seq] = event_ts_ms
         if emit == "last" and last is not None:   # cut / skipped events after it do not change the window
             out.append((last[0], last[1], window_to_tensor(self.window, sidx, max_len)))
+            self.last_pred_seq_no = last[0]
+            self.last_pred_event_ts_ms = last[2]
+            self.emitted_event_ts_ms[last[0]] = last[2]
         return out
 
     def _step(self, seq, ev, spec):

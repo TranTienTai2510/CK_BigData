@@ -1,0 +1,4 @@
+**
+!Dockerfile.spark
+!docker/
+!docker/spark-entrypoint.sh

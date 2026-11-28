@@ -31,9 +31,12 @@ CREATE TABLE IF NOT EXISTS rt.intent (
 ) ENGINE = MergeTree ORDER BY (event_ts, shop_id, session_id, seq_no);
 
 CREATE TABLE IF NOT EXISTS rt.session_closed (
-  shop_id String, session_id Int64, last_seq_no Int32, last_event_ts DateTime64(3,'UTC'),
+  shop_id String, session_id Int64, last_pred_seq_no Nullable(Int32), last_seq_no Int32,
+  last_event_ts DateTime64(3,'UTC'),
   label_purchase UInt8, revenue_usd Float64
 ) ENGINE = MergeTree ORDER BY (last_event_ts, shop_id, session_id);
+ALTER TABLE rt.session_closed
+  ADD COLUMN IF NOT EXISTS last_pred_seq_no Nullable(Int32) AFTER session_id;
 
 CREATE TABLE IF NOT EXISTS ops.metrics (
   job String, ts DateTime64(3,'UTC'), status String, lag_s Float64 DEFAULT 0, throughput_eps Float64 DEFAULT 0

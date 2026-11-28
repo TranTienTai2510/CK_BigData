@@ -5,7 +5,8 @@ from pyspark.sql import functions as F, types as T
 from common.canonical import EVENT_SCHEMA
 
 def build(spark, bootstrap, in_topic="events.clean", out_topic="agg.kpi",
-          watermark="10 minutes", starting="latest"):
+          watermark="10 minutes", starting="latest",
+          checkpoint_dir="/opt/project/checkpoints/q1-kpi"):
     src = (spark.readStream.format("kafka")
            .option("kafka.bootstrap.servers", bootstrap)
            .option("subscribe", in_topic)
@@ -14,7 +15,7 @@ def build(spark, bootstrap, in_topic="events.clean", out_topic="agg.kpi",
     df = df.withWatermark("event_ts", watermark).dropDuplicates(["shop_id", "event_id"])
     kpi = (df.groupBy(F.window("event_ts", "10 seconds"), "shop_id").agg(
         F.count("*").alias("n_events"),
-        F.countDistinct("session_id").alias("n_sessions"),
+        F.approx_count_distinct("session_id", 0.01).alias("n_sessions"),
         F.sum((F.col("event_type") == "purchase").cast("int")).alias("n_purchase"),
         F.sum("amount_usd").alias("revenue_usd"),
         F.sum((F.col("event_type") == "add_to_cart").cast("int")).alias("n_add"),
@@ -25,7 +26,7 @@ def build(spark, bootstrap, in_topic="events.clean", out_topic="agg.kpi",
     out = kpi.select(F.to_json(F.struct(*kpi.columns)).alias("value"))
     q = (out.writeStream.format("kafka").option("kafka.bootstrap.servers", bootstrap)
          .option("topic", out_topic)
-         .option("checkpointLocation", "/opt/project/checkpoints/q1-kpi")
+         .option("checkpointLocation", checkpoint_dir)
          .outputMode("append").start())
     return [q]
 
@@ -34,10 +35,17 @@ if __name__ == "__main__":
     ap.add_argument("--bootstrap", default=os.environ.get("KAFKA_BOOTSTRAP", "redpanda:9092"))
     ap.add_argument("--watermark", default="10 minutes")
     ap.add_argument("--starting", default="latest")
+    ap.add_argument("--checkpoint", default="/opt/project/checkpoints/q1-kpi")
     a = ap.parse_args()
     from pyspark.sql import SparkSession
     spark = (SparkSession.builder.appName("q1-kpi")
              .config("spark.sql.session.timeZone", "UTC").getOrCreate())
     spark.sparkContext.setLogLevel("WARN")
-    for q in build(spark, a.bootstrap, watermark=a.watermark, starting=a.starting):
+    for q in build(
+        spark,
+        a.bootstrap,
+        watermark=a.watermark,
+        starting=a.starting,
+        checkpoint_dir=a.checkpoint,
+    ):
         q.awaitTermination()

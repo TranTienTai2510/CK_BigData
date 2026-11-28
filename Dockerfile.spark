@@ -30,7 +30,8 @@ ENV PYSPARK_PYTHON=/usr/local/bin/python \
 WORKDIR /opt/project
 
 COPY docker/spark-entrypoint.sh /usr/local/bin/spark-entrypoint.sh
-RUN chmod +x /usr/local/bin/spark-entrypoint.sh \
+RUN sed -i 's/\r$//' /usr/local/bin/spark-entrypoint.sh \
+    && chmod +x /usr/local/bin/spark-entrypoint.sh \
     && mkdir -p /opt/project/checkpoints
 
 ENTRYPOINT ["/usr/local/bin/spark-entrypoint.sh"]

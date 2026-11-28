@@ -1,19 +1,19 @@
 -- B: Kafka engine + MVs. Redpanda reachable as redpanda:9092 from clickhouse net.
 -- Run after schema.sql, when Redpanda is up.
 CREATE TABLE IF NOT EXISTS rt.events_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='events.raw', kafka_group_name='ch-events', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='events.clean', kafka_group_name='ch-events-clean', kafka_format='JSONAsString';
 CREATE TABLE IF NOT EXISTS rt.order_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='order_events.raw', kafka_group_name='ch-orders', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='order_events.raw', kafka_group_name='ch-orders', kafka_format='JSONAsString';
 CREATE TABLE IF NOT EXISTS rt.kpi_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='agg.kpi', kafka_group_name='ch-kpi', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='agg.kpi', kafka_group_name='ch-kpi', kafka_format='JSONAsString';
 CREATE TABLE IF NOT EXISTS rt.intent_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='pred.intent', kafka_group_name='ch-intent', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='pred.intent', kafka_group_name='ch-intent', kafka_format='JSONAsString';
 CREATE TABLE IF NOT EXISTS rt.closed_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='session.closed', kafka_group_name='ch-closed', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='session.closed', kafka_group_name='ch-closed', kafka_format='JSONAsString';
 CREATE TABLE IF NOT EXISTS ops.metrics_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='ops.metrics', kafka_group_name='ch-metrics', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='ops.metrics', kafka_group_name='ch-metrics', kafka_format='JSONAsString';
 CREATE TABLE IF NOT EXISTS rt.dlq_queue (payload String) ENGINE = Kafka
-SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='events.dlq', kafka_group_name='ch-dlq', kafka_format='RawAsString';
+SETTINGS kafka_broker_list='redpanda:9092', kafka_topic_list='events.dlq', kafka_group_name='ch-dlq', kafka_format='JSONAsString';
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS rt.mv_events TO rt.events AS
 SELECT JSONExtractString(payload,'shop_id') shop_id, JSONExtractInt(payload,'event_id') event_id,
@@ -45,8 +45,10 @@ SELECT JSONExtractString(payload,'shop_id') shop_id, JSONExtractInt(payload,'ses
  parseDateTime64BestEffort(JSONExtractString(payload,'event_ts'),3,'UTC') event_ts,
  JSONExtractFloat(payload,'prob') prob, JSONExtractString(payload,'model_ver') model_ver FROM rt.intent_queue;
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS rt.mv_closed TO rt.session_closed AS
+DROP VIEW IF EXISTS rt.mv_closed;
+CREATE MATERIALIZED VIEW rt.mv_closed TO rt.session_closed AS
 SELECT JSONExtractString(payload,'shop_id') shop_id, JSONExtractInt(payload,'session_id') session_id,
+ nullIf(JSONExtractInt(payload,'last_pred_seq_no'),0) last_pred_seq_no,
  JSONExtractInt(payload,'last_seq_no') last_seq_no,
  parseDateTime64BestEffort(JSONExtractString(payload,'last_event_ts'),3,'UTC') last_event_ts,
  JSONExtractInt(payload,'label_purchase') label_purchase, JSONExtractFloat(payload,'revenue_usd') revenue_usd FROM rt.closed_queue;
@@ -56,3 +58,11 @@ SELECT JSONExtractString(payload,'job') job,
  parseDateTime64BestEffort(JSONExtractString(payload,'ts'),3,'UTC') ts,
  JSONExtractString(payload,'status') status,
  JSONExtractFloat(payload,'lag_s') lag_s, JSONExtractFloat(payload,'throughput_eps') throughput_eps FROM ops.metrics_queue;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS rt.mv_dlq TO rt.dlq AS
+SELECT JSONExtractString(payload,'shop_id') shop_id,
+ JSONExtractInt(payload,'session_id') session_id, JSONExtractInt(payload,'event_id') event_id,
+ JSONExtractInt(payload,'seq_no') seq_no, JSONExtractString(payload,'event_type') event_type,
+ parseDateTime64BestEffortOrNull(JSONExtractString(payload,'event_ts'),3,'UTC') event_ts,
+ JSONExtract(payload,'failed_rules','Array(String)') failed_rules,
+ parseDateTime64BestEffort(JSONExtractString(payload,'kafka_ts'),3,'UTC') kafka_ts FROM rt.dlq_queue;

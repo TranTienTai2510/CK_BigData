@@ -193,7 +193,7 @@ notebook = {
             "source": [
                 "---\n",
                 "### 7. Spark Streaming Q2: Trạng thái Phiên & Suy luận Trực tuyến (Mốc G5)\n",
-                "Thử nghiệm trực tiếp module `Q2Processor` (`streaming/q2_intent.py`) trên chuỗi sự kiện có thứ tự xáo trộn."
+                "Q2 dùng `applyInPandasWithState` với event-time timeout; kiểm thử tích hợp chạy bằng lệnh bên dưới."
             ]
         },
         {
@@ -202,21 +202,13 @@ notebook = {
             "metadata": {},
             "outputs": [],
             "source": [
-                "from streaming.q2_intent import Q2Processor\n",
+                "from common.messages import Q2_OUTPUT_SCHEMA\n",
+                "from streaming.q2_intent import SESSION_INACTIVITY_MS\n",
                 "\n",
-                "q2 = Q2Processor(spec_path='../models/feature_spec.json', model_path='../models/intent_v1.onnx')\n",
-                "sample_stream = [\n",
-                "    {'shop_id': 'rees46_cosmetics', 'session_id': 9999, 'seq_no': 2, 'event_type': 'add_to_cart', 'product_id': 777, 'category': 'lip', 'brand': 'mac', 'price': 30.0, 'qty': 1, 'amount_usd': None, 'event_ts': '2024-01-01 12:01:00.000', 'ts_ms': 1704110460000},\n",
-                "    {'shop_id': 'rees46_cosmetics', 'session_id': 9999, 'seq_no': 1, 'event_type': 'page_view', 'product_id': 777, 'category': 'lip', 'brand': 'mac', 'price': 30.0, 'qty': None, 'amount_usd': None, 'event_ts': '2024-01-01 12:00:00.000', 'ts_ms': 1704110400000},\n",
-                "    {'shop_id': 'rees46_cosmetics', 'session_id': 9999, 'seq_no': 3, 'event_type': 'purchase', 'product_id': None, 'category': None, 'brand': None, 'price': None, 'qty': None, 'amount_usd': 30.0, 'event_ts': '2024-01-01 12:02:00.000', 'ts_ms': 1704110520000}\n",
-                "]\n",
-                "intents, closed = q2.process_records(sample_stream, force_close=False)\n",
-                "print('Output topic pred.intent:')\n",
-                "for it in intents:\n",
-                "    print(f\"  seq={it['seq_no']} | event_ts={it['event_ts']} | prob={it['prob']:.4f} | model={it['model_ver']}\")\n",
-                "print('Output topic session.closed:')\n",
-                "for cl in closed:\n",
-                "    print(f\"  last_seq={cl['last_seq_no']} | label_purchase={cl['label_purchase']} | revenue_usd={cl['revenue_usd']}\")"
+                "print('Q2 state/output fields:', Q2_OUTPUT_SCHEMA.fieldNames())\n",
+                "print(f'Session inactivity timeout: {SESSION_INACTIVITY_MS // 60000} event-time minutes')\n",
+                "print('Start the Spark query with: ./streaming/submit_q2.sh')\n",
+                "print('Run the stateful lifecycle/parity test with: python tests/test_q2_parity.py')"
             ]
         },
         {

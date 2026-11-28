@@ -4,5 +4,6 @@ datasources:
     type: grafana-clickhouse-datasource
     access: proxy
     url: http://clickhouse:8123
+    isDefault: true
     jsonData: { defaultDatabase: default, username: default }
     secureJsonData: { password: clickstream }

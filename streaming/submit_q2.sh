@@ -8,7 +8,9 @@ PKG=org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5
 APP=/opt/project/streaming
 SUBMIT="$(python -c 'import pyspark, os; print(os.path.join(os.path.dirname(pyspark.__file__), "bin", "spark-submit"))')"
 
-"$SUBMIT" --master $MASTER --packages $PKG \
+"$SUBMIT" --master "$MASTER" --repositories https://repo.maven.apache.org/maven2 \
+  --packages "$PKG" \
+  --exclude-packages org.apache.hadoop:hadoop-client-api,org.apache.hadoop:hadoop-client-runtime \
   --conf spark.sql.session.timeZone=UTC \
   $APP/q2_intent.py \
   --bootstrap ${KAFKA_BOOTSTRAP:-redpanda:9092} \

@@ -27,7 +27,10 @@ CREATE OR REPLACE VIEW rt.v_review_dist AS SELECT review_score, count() n FROM r
 CREATE OR REPLACE VIEW rt.v_pred_1m AS SELECT toStartOfMinute(event_ts) m, count() n, avg(prob) avg_prob, quantiles(0.5,0.9,0.95)(prob) q FROM rt.intent GROUP BY m;
 -- 12
 CREATE OR REPLACE VIEW rt.v_online_eval_1m AS SELECT toStartOfMinute(c.last_event_ts) m, count() n_closed,
- avgIf(i.prob, c.label_purchase=1) avg_p_pos, avgIf(i.prob, c.label_purchase=0) avg_p_neg FROM rt.session_closed c LEFT JOIN rt.intent i ON c.shop_id=i.shop_id AND c.session_id=i.session_id AND c.last_seq_no=i.seq_no GROUP BY m;
+ avgIf(i.prob, c.label_purchase=1) avg_p_pos, avgIf(i.prob, c.label_purchase=0) avg_p_neg
+ FROM rt.session_closed c LEFT JOIN rt.intent i
+ ON c.shop_id=i.shop_id AND c.session_id=i.session_id AND c.last_pred_seq_no=i.seq_no
+ GROUP BY m;
 -- 13
 CREATE OR REPLACE VIEW rt.v_top_categories AS SELECT category, count() views, countIf(event_type='purchase') purchases FROM rt.events WHERE category != '' GROUP BY category ORDER BY views DESC LIMIT 20;
 -- 14

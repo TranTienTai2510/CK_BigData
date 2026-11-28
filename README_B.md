@@ -1,7 +1,7 @@
 # B — Platform & Streaming (runbook)
 
 ## 0. Chuẩn môi trường
-`python -m common.runtime_env` đã PASS (Python 3.10, PySpark 3.5.5, JDK 17, HADOOP_HOME `D:\hadoop`). WSL2 `.wslconfig` 10GB đã có. `SPARK_HOME=C:\spark-3.5.8-bin-hadoop3 (will be ignored)` là bình thường — `common/runtime_env.py` tự bỏ qua để dùng đúng jar của pip `pyspark==3.5.5`.
+Môi trường Spark local trên Windows cần Python 3.10, PySpark 3.5.5, JDK 17, `winutils.exe` + `hadoop.dll` trong `D:\hadoop\bin`. Chạy `python -m common.runtime_env` để xác nhận. Spark trong Docker dùng JDK/PySpark được đóng gói trong image; master và worker chạy foreground bằng `spark-class`.
 
 Cài thêm thư viện còn thiếu cho batch + simulator + ML (chạy 1 lần trong `.venv`):
 ```powershell
@@ -24,9 +24,9 @@ docker exec -it <ten-container-redpanda> rpk topic list -X brokers=redpanda:9092
 Nạp DDL ClickHouse (chạy trong PowerShell, dùng pipe thay cho `<` vì PowerShell không hỗ trợ `<`):
 ```powershell
 $ch = (docker ps --format "{{.Names}}" | Select-String "clickhouse" | Select-Object -First 1).ToString().Trim()
-Get-Content clickhouse/schema.sql -Raw | docker exec -i $ch clickhouse-client -u default --password clickstream --multiquery
-Get-Content clickhouse/kafka_ingest.sql -Raw | docker exec -i $ch clickhouse-client -u default --password clickstream --multiquery
-Get-Content clickhouse/views.sql -Raw | docker exec -i $ch clickhouse-client -u default --password clickstream --multiquery
+Get-Content clickhouse/schema.sql -Raw | docker exec -i $ch clickhouse client --user default --password clickstream --multiquery
+Get-Content clickhouse/kafka_ingest.sql -Raw | docker exec -i $ch clickhouse client --user default --password clickstream --multiquery
+Get-Content clickhouse/views.sql -Raw | docker exec -i $ch clickhouse client --user default --password clickstream --multiquery
 ```
 
 ## 2. Simulator (G1: ~1100 ev/s, 3 shop, fold stress)
@@ -40,15 +40,23 @@ python simulator.py --limit 2000 --dry-run
 ```
 
 ## 3. Spark Q0/Q1 (G3 image + submit)
-```bash
-./streaming/submit.sh all
+```powershell
+$spark = (docker compose ps -q spark-master).Trim()
+$sparkSubmit = "/usr/local/lib/python3.10/site-packages/pyspark/bin/spark-submit"
+docker exec -d $spark $sparkSubmit --master spark://spark-master:7077 --driver-memory 512m --executor-memory 512m --total-executor-cores 2 --repositories https://repo.maven.apache.org/maven2 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 --exclude-packages org.apache.hadoop:hadoop-client-api,org.apache.hadoop:hadoop-client-runtime /opt/project/streaming/all_jobs.py
 # G3 check cho A:
-./streaming/submit_example.sh
+docker exec -it $spark /opt/project/streaming/submit_example.sh
 # checkpoints: volume spark-checkpoints (/opt/project/checkpoints/q0-*, q1-*)
 ```
 
+`docker-compose.yml` mount các thư mục `common/`, `ml/`, `streaming/`, `models/` vào master/worker. `all_jobs.py` gom Q0/Q1/Q2 vào một Spark application để giảm RAM trên máy demo; Spark UI hiển thị app `clickstream-q0-q1-q2`. Trước khi chạy Q2, cần có `models/intent_v1.onnx` khớp với `models/feature_spec.json`; nếu chưa có model, huấn luyện/xuất bằng `python ml/train_dl.py`.
+
+Trong `all_jobs.py`, watermark KPI là 10 giây để cửa sổ 10 giây xuất hiện trong lượt demo ngắn; các checkpoint Q1/Q2 tích hợp là `q1-kpi-e2e` và `q2-intent-e2e`. Job Q1 chạy độc lập vẫn giữ watermark mặc định 10 phút và checkpoint riêng. Simulator tăng event-time theo `--speed-factor`; `--max-sleep` chỉ giới hạn thời gian chờ thực tế.
+
 ## 4. Grafana
-Mở `http://localhost:3000` (admin/admin), datasource ClickHouse tự provision, 3 dashboard: KPI, SLA Olist, Model online (fake-data tolerant tới G5).
+Mở `http://localhost:3000` (admin/admin), datasource ClickHouse và dashboard JSON được provision từ `grafana/provisioning/` và `grafana/dashboards/`. ClickHouse HTTP: `http://localhost:8123` (user `default`, password `clickstream`).
+
+`python analysis/live.py eval --out data/prefix/_online_eval.json` và `python analysis/live.py monitor` truy vấn ClickHouse thật; nếu ClickHouse không truy cập được, lệnh eval báo lỗi thay vì sinh dữ liệu đánh giá giả.
 
 ## 5. Stress + recovery (Tuần 5)
 ```bash

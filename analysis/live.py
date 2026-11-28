@@ -177,7 +177,7 @@ def query_clickhouse_pairs(host="localhost", port=8123, user="default", password
     INNER JOIN rt.intent i
         ON c.shop_id = i.shop_id
         AND c.session_id = i.session_id
-        AND c.last_seq_no = i.seq_no
+        AND c.last_pred_seq_no = i.seq_no
     FORMAT JSONEachRow
     """
     url = f"http://{host}:{port}/?user={user}&password={password}"
@@ -189,6 +189,30 @@ def query_clickhouse_pairs(host="localhost", port=8123, user="default", password
             if line:
                 pairs.append(json.loads(line.decode("utf-8")))
     return pairs
+
+
+def query_pipeline_heartbeat(host="localhost", port=8123, user="default", password="clickstream"):
+    """Return observed event throughput (10s window) and event-time lag from ClickHouse."""
+    import urllib.parse
+    import urllib.request
+
+    query = """
+    SELECT countIf(event_ts >= now64(3) - INTERVAL 10 SECOND) / 10.0,
+           if(count() = 0, 0.0, dateDiff('millisecond', max(event_ts), now64(3)) / 1000.0)
+    FROM rt.events
+    FORMAT TabSeparated
+    """
+    params = urllib.parse.urlencode({"user": user, "password": password})
+    req = urllib.request.Request(
+        f"http://{host}:{port}/?{params}",
+        data=query.encode("utf-8"),
+        headers={"Content-Type": "text/plain"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        values = resp.read().decode("utf-8").strip().split("\t")
+    if len(values) != 2:
+        raise ValueError(f"unexpected ClickHouse heartbeat response: {values!r}")
+    return float(values[0]), float(values[1])
 
 
 # ---------------------------------------------------------------- Pipeline Monitor (G6 check)
@@ -256,26 +280,15 @@ def cmd_eval(args):
             pairs = query_clickhouse_pairs(host=args.ch_host, port=args.ch_port,
                                            user=args.ch_user, password=args.ch_pass)
             print(f"Queried {len(pairs)} prediction pairs from ClickHouse.")
-        except Exception as e:
-            print(f"ClickHouse unreachable ({e}), generating synthetic evaluation fixture...")
-            # Generate deterministic evaluation pairs for demonstration
-            np.random.seed(42)
-            n_samples = 2000
-            for i in range(n_samples):
-                shop = "rees46_cosmetics" if i % 3 != 0 else "synthetic"
-                k = int(np.random.choice([1, 2, 4, 7, 15, 25, 60]))
-                y = 1 if (np.random.rand() < (0.28 if shop == "synthetic" else 0.07)) else 0
-                # Theoretical Gaussian signal model matching offline AUC ~0.785
-                score = np.random.normal(loc=1.116 if y == 1 else 0.0, scale=1.0)
-                prob = float(1.0 / (1.0 + np.exp(-score)))
-                pairs.append({
-                    "shop_id": shop,
-                    "session_id": 100000 + i,
-                    "seq_no": k,
-                    "prob": prob,
-                    "label_purchase": y,
-                    "model_ver": args.model_ver,
-                })
+        except (OSError, TimeoutError) as e:
+            raise RuntimeError(
+                f"ClickHouse evaluation query failed ({e}); start ClickHouse or provide a valid --snapshot."
+            ) from e
+
+    if not pairs:
+        raise RuntimeError(
+            "No online prediction/closed-session pairs are available; run the stream or provide a populated --snapshot."
+        )
 
     report = evaluate_online_pairs(pairs, offline_auc=offline_auc, model_ver=args.model_ver)
 
@@ -329,11 +342,10 @@ def cmd_monitor(args):
         while time.time() < end_time:
             now = time.time()
             step += 1
-            # In live mode with ClickHouse, query ops.v_lag
-            # In stand-alone simulation mode, simulate healthy heartbeats:
-            sim_eps = 1100.0 + 50.0 * np.sin(step / 5.0)
-            sim_lag = 1.2 + 0.3 * np.cos(step / 3.0)
-            monitor.record_heartbeat(now, sim_eps, sim_lag)
+            throughput_eps, lag_s = query_pipeline_heartbeat(
+                host=args.ch_host, port=args.ch_port, user=args.ch_user, password=args.ch_pass
+            )
+            monitor.record_heartbeat(now, throughput_eps, lag_s)
 
             health = monitor.check_health()
             elapsed_m = (now - start_time) / 60.0
@@ -399,6 +411,10 @@ def main():
     p_mon.add_argument("--duration-min", type=float, default=1.0)
     p_mon.add_argument("--interval-s", type=float, default=2.0)
     p_mon.add_argument("--max-lag-s", type=float, default=60.0)
+    p_mon.add_argument("--ch-host", default="localhost")
+    p_mon.add_argument("--ch-port", type=int, default=8123)
+    p_mon.add_argument("--ch-user", default="default")
+    p_mon.add_argument("--ch-pass", default="clickstream")
     p_mon.add_argument("--dry-run", action="store_true")
     p_mon.add_argument("--fail-fast", action="store_true")
 

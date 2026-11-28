@@ -6,7 +6,7 @@ common/contract.py (CANONICAL_RULES / ORDER_EVENT_RULES). Never edits contract.
 
 Features (G1):
   - replay 3 shop: synthetic / rees46_cosmetics / olist (events + order_events)
-  - time-warp: scale gaps by --speed-factor, cap gap by --max-sleep
+  - time-warp: scale event-time gaps by --speed-factor, cap actual sleep by --max-sleep
   - shift future timestamps: rows with event_ts in the past are shifted so the
     first event starts at --start-offset-s seconds ago; order_events
     estimated_delivery_ts is shifted by the same delta (per requirement)
@@ -44,6 +44,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 
 LOG = logging.getLogger("simulator")
 SCHEMA_VERSION = 3
+INTEGER_FIELDS = (
+    "event_id", "session_id", "order_id", "customer_id", "seq_no",
+    "product_id", "qty", "cart_size", "discount_pct", "n_items", "review_score",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -140,13 +144,34 @@ def shift_dt(v: Any, delta: timedelta) -> Any:
     return dt.astimezone(timezone.utc) + delta
 
 
-def load_sorted(files: list[str], ts_col="event_ts", id_col="event_id"):
+def _scaled_gap(previous: datetime, current: datetime, speed_factor: float,
+                max_sleep: float) -> tuple[float, float]:
+    event_gap = max((current - previous).total_seconds(), 0.0) / speed_factor
+    sleep_gap = min(event_gap, max_sleep) if max_sleep > 0 else event_gap
+    return event_gap, sleep_gap
+
+
+def load_sorted(files: list[str], ts_col="event_ts", id_col="event_id", row_limit: int = 0):
     import pandas as pd
     frames = []
+    remaining = row_limit
     for f in files:
         df = pd.read_parquet(f)
         if not df.empty:
+            if "shop_id" not in df.columns:
+                partition = next(
+                    (part for part in reversed(Path(f).parts) if part.startswith("shop_id=")),
+                    None,
+                )
+                if partition is None:
+                    raise ValueError(f"shop_id column or partition is required: {f}")
+                df["shop_id"] = partition.split("=", 1)[1]
+            if remaining > 0:
+                df = df.head(remaining)
+                remaining -= len(df)
             frames.append(df)
+            if remaining == 0:
+                break
     if not frames:
         raise ValueError("No rows in selected Parquet inputs.")
     ev = pd.concat(frames, ignore_index=True)
@@ -156,6 +181,22 @@ def load_sorted(files: list[str], ts_col="event_ts", id_col="event_id"):
 
 def build_payload(row, replay_ts: datetime, delta: timedelta) -> dict:
     payload = {str(k): to_json_value(v) for k, v in row.items()}
+    for field in INTEGER_FIELDS:
+        value = payload.get(field)
+        if value is not None:
+            integer = int(value)
+            if integer != value:
+                raise ValueError(f"{field} must be an integer, got {value!r}")
+            payload[field] = integer
+    for item in payload.get("items") or []:
+        if isinstance(item, dict):
+            for field in ("product_id", "qty"):
+                value = item.get(field)
+                if value is not None:
+                    integer = int(value)
+                    if integer != value:
+                        raise ValueError(f"items[].{field} must be an integer, got {value!r}")
+                    item[field] = integer
     payload["schema_version"] = SCHEMA_VERSION
     payload["event_ts"] = replay_ts.astimezone(timezone.utc).isoformat(timespec="microseconds")
     for col in ("ts_raw", "session_start_ts", "estimated_delivery_ts"):
@@ -201,6 +242,26 @@ def main() -> None:
 
     sent = 0
     late_buf: list[tuple[dict, str]] = []
+    pending = []
+
+    def flush_pending():
+        if producer is None or not pending:
+            return
+        producer.flush(timeout=30)
+        for future in pending:
+            future.get(timeout=30)
+        pending.clear()
+
+    def publish(topic, key, payload):
+        nonlocal sent
+        if producer is None:
+            sent += 1
+            return
+        pending.append(producer.send(topic, key=key, value=payload))
+        sent += 1
+        if len(pending) >= 1000:
+            flush_pending()
+
     try:
         while True:
             for kind, topic in jobs:
@@ -208,7 +269,7 @@ def main() -> None:
                                        shops if kind == "events" else ["olist"], yms)
                 if not files:
                     continue
-                ev = load_sorted(files)
+                ev = load_sorted(files, row_limit=args.limit)
                 t0_hist = ev["event_ts"].iloc[0].to_pydatetime()
                 replay_start = datetime.now(timezone.utc) - timedelta(seconds=args.start_offset_s)
                 delta = replay_start - t0_hist.astimezone(timezone.utc)
@@ -219,10 +280,11 @@ def main() -> None:
                     if prev_hist is None:
                         sched = replay_start
                     else:
-                        gap = max((hist - prev_hist).total_seconds(), 0.0) / args.speed_factor
-                        gap = min(gap, args.max_sleep) if args.max_sleep > 0 else gap
-                        time.sleep(gap)
-                        sched = sched + timedelta(seconds=gap)
+                        event_gap, sleep_gap = _scaled_gap(
+                            prev_hist, hist, args.speed_factor, args.max_sleep
+                        )
+                        time.sleep(sleep_gap)
+                        sched = sched + timedelta(seconds=event_gap)
                     payload = build_payload(row, sched, delta)
                     n_copies = args.fold
                     for f in range(n_copies):
@@ -231,21 +293,20 @@ def main() -> None:
                         key = f"{key_base}#f{f}" if args.fold > 1 else key_base
                         r = rng.random()
                         if r < args.dup_pct and producer is not None:
-                            producer.send(topic, key=key, value=p).get(timeout=30)
-                            sent += 1
+                            publish(topic, key, p)
                         if rng.random() < args.late_pct:
                             late_buf.append((p, key))  # flush a few later -> late events
                             if len(late_buf) >= 50 and producer is not None:
                                 lp, lk = late_buf.pop(0)
-                                producer.send(topic, key=lk, value=lp).get(timeout=30)
-                                sent += 1
+                                publish(topic, lk, lp)
+                                if args.limit and sent >= args.limit:
+                                    flush_pending()
+                                    LOG.info("Reached limit %d", args.limit)
+                                    return
                             continue
-                        if producer is None:
-                            sent += 1
-                        else:
-                            producer.send(topic, key=key, value=p).get(timeout=30)
-                            sent += 1
+                        publish(topic, key, p)
                         if args.limit and sent >= args.limit:
+                            flush_pending()
                             LOG.info("Reached limit %d", args.limit)
                             return
                         if sent % 2000 == 0:
@@ -254,9 +315,12 @@ def main() -> None:
                 if producer is not None:
                     while late_buf:  # drain lates at end of pass
                         lp, lk = late_buf.pop(0)
-                        producer.send(topic, key=lk, value=p if False else lp).get(timeout=30)
-                        sent += 1
-                    producer.flush()
+                        publish(topic, lk, lp)
+                        if args.limit and sent >= args.limit:
+                            flush_pending()
+                            LOG.info("Reached limit %d", args.limit)
+                            return
+                    flush_pending()
                 LOG.info("Pass done kind=%s topic=%s total=%d", kind, topic, sent)
                 if args.limit and sent >= args.limit:
                     return

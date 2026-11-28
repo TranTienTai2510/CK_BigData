@@ -820,9 +820,9 @@
   "shop": 5
  },
  "source": {
-  "unified": "D:\\HocTap\\Big Data\\project_CK\\CK_BigData\\data\\unified",
+  "unified": "D:\\Nam4\\Big_data\\CKBD_td2\\CK_BigData\\data\\unified",
   "split": "train",
   "min_count": 5,
-  "built_utc": "2026-11-05 01:17:29"
+  "built_utc": "2026-11-19 09:31:02"
  }
 }
